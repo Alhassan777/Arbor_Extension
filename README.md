@@ -11,7 +11,143 @@ Organize your ChatGPT conversations hierarchically with intelligent tree navigat
 - ✅ Context generation for branching with Gemini 2.0 Flash-Lite
 - ✅ Secure API key management (BYOK - Bring Your Own Key)
 
-## 🚀 Quick Start - Testing the Extension
+## 📦 Installation (Developer Mode)
+
+Since Arbor Extension is not yet published on the Chrome Web Store, you can install it manually in developer mode. Here's how:
+
+### Prerequisites
+
+- **Chrome, Edge, or Brave browser** (Chromium-based)
+- **Node.js and npm** installed on your computer
+- **Git** (to clone the repository)
+
+### Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/Alhassan777/Arbor_Extension.git
+cd Arbor_Extension
+```
+
+### Step 2: Install Dependencies
+
+```bash
+npm install
+```
+
+This will install all required dependencies listed in `package.json`.
+
+### Step 3: Build the Extension
+
+```bash
+npm run build
+```
+
+This compiles the TypeScript code and creates the `dist/` folder with all extension files.
+
+**Note**: For development, you can use `npm run dev` which will watch for changes and auto-rebuild.
+
+### Step 4: Load the Extension in Chrome
+
+1. **Open Chrome/Edge/Brave** and navigate to the extensions page:
+   - **Chrome**: Type `chrome://extensions/` in the address bar
+   - **Edge**: Type `edge://extensions/` in the address bar
+   - **Brave**: Type `brave://extensions/` in the address bar
+
+2. **Enable Developer Mode**:
+   - Look for the **"Developer mode"** toggle in the top-right corner
+   - Click the toggle to enable it (it should turn blue/on)
+
+3. **Load the Extension**:
+   - Click the **"Load unpacked"** button (appears when Developer Mode is enabled)
+   - Navigate to the `Arbor_Extension` folder you cloned
+   - Select the **`dist`** folder (NOT the root folder)
+   - Click **"Select Folder"** or **"Open"**
+
+4. **Verify Installation**:
+   - You should see "Arbor - Chat Tree Navigator" appear in your extensions list
+   - The extension icon should appear in your browser toolbar
+   - Check that there are no errors displayed in red
+
+### Step 5: Configure Your API Key (Optional but Recommended)
+
+Arbor uses Google Gemini AI for intelligent context generation. To enable this feature:
+
+1. **Get a Gemini API Key**:
+   - Visit [Google AI Studio](https://aistudio.google.com/app/apikey)
+   - Sign in with your Google account
+   - Click **"Create API Key"**
+   - Copy the generated key (starts with `AIza...`)
+
+2. **Add the API Key to the Extension**:
+   - Right-click the Arbor extension icon in your toolbar → **"Options"**
+   - OR go to `chrome://extensions/` → Find Arbor → Click **"Options"**
+   - Paste your API key in the input field
+   - Click **"Save API Key"**
+   - Optionally click **"Test Connection"** to verify it works
+
+**Note**: The API key is encrypted and stored locally on your device. It's never transmitted to any server except Google's Gemini API.
+
+### Step 6: Start Using the Extension!
+
+1. **Visit ChatGPT**: Go to [https://chatgpt.com](https://chatgpt.com)
+
+2. **You should see**:
+   - **Left sidebar**: Tree view of your conversations
+   - **Right sidebar**: Graph visualization (optional)
+   - **"Track this chat"** prompt when you're in a conversation
+
+3. **Try it out**:
+   - Click **"Track this chat"** to add the current conversation to your tree
+   - Create a new tree by clicking **"New Tree"** in the sidebar
+   - Create branches from existing conversations
+   - Navigate between conversations by clicking tree nodes
+
+### Troubleshooting Installation
+
+**Extension not showing up?**
+- Make sure you selected the `dist/` folder, not the root folder
+- Check that `npm run build` completed successfully
+- Look for errors in `chrome://extensions/` (red error messages)
+
+**Build errors?**
+- Make sure Node.js is installed: `node --version`
+- Make sure npm is installed: `npm --version`
+- Try deleting `node_modules/` and running `npm install` again
+
+**Extension icon not visible?**
+- Click the puzzle icon (🧩) in Chrome toolbar to see all extensions
+- Pin Arbor to your toolbar for easier access
+
+**Sidebar not appearing on ChatGPT?**
+- Make sure you're on `chatgpt.com` (the extension only works there)
+- Refresh the page
+- Check the browser console (F12) for errors
+- Verify the extension is enabled in `chrome://extensions/`
+
+### Updating the Extension
+
+When you pull new changes from the repository:
+
+1. **Pull the latest code**:
+   ```bash
+   git pull origin main
+   ```
+
+2. **Rebuild the extension**:
+   ```bash
+   npm run build
+   ```
+
+3. **Reload the extension**:
+   - Go to `chrome://extensions/`
+   - Find Arbor extension
+   - Click the **reload icon** (🔄)
+
+4. **Refresh ChatGPT page** to see changes
+
+---
+
+## 🚀 Quick Start - Testing the Extension (For Developers)
 
 ### 1. Build the Extension
 
