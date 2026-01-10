@@ -402,6 +402,23 @@ class ArborExtension {
       case "navigateToNode":
         await this.handleNodeClick(data);
         break;
+      case "reparentNode":
+        if (data?.nodeId && data?.newParentId && this.state.currentTreeId) {
+          const tree = this.state.trees[this.state.currentTreeId];
+          const success = await this.nodeManager.reparentNode(
+            data.nodeId,
+            data.newParentId,
+            tree,
+            this.state.currentTreeId
+          );
+          if (success) {
+            this.showNotification("Node reparented! 🔄", "success");
+            this.refresh();
+          } else {
+            this.showNotification("Cannot reparent node (would create cycle or invalid structure)", "error");
+          }
+        }
+        break;
     }
   }
 

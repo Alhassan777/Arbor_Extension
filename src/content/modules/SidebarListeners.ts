@@ -84,14 +84,112 @@ export class SidebarListeners {
 
     // Tree node click handlers (for navigation)
     document.querySelectorAll(".tree-node").forEach((node) => {
-      node.addEventListener("click", (e) => {
+      const nodeEl = node as HTMLElement;
+      const nodeId = nodeEl.dataset.nodeId;
+      if (!nodeId) return;
+
+      let hasDragged = false;
+
+      // Drag start
+      nodeEl.addEventListener("dragstart", (e) => {
+        if (!nodeEl.draggable) return;
+        if (!e.dataTransfer) return;
+        
+        hasDragged = false;
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("application/arbor-node-id", nodeId);
+        nodeEl.style.opacity = "0.5";
+        nodeEl.style.cursor = "grabbing";
+        
+        // Set flag after a short delay to allow drag to start
+        setTimeout(() => {
+          hasDragged = true;
+        }, 10);
+      });
+
+      // Drag end
+      nodeEl.addEventListener("dragend", (e) => {
+        const wasDragging = hasDragged;
+        nodeEl.style.opacity = "1";
+        nodeEl.style.cursor = "grab";
+        
+        // Remove drop target highlighting from all nodes
+        document.querySelectorAll(".tree-node").forEach((n) => {
+          (n as HTMLElement).style.background = "";
+          (n as HTMLElement).style.borderLeft = "3px solid #2dd4a7";
+        });
+
+        // Reset flag after drag ends (small delay to prevent click)
+        setTimeout(() => {
+          hasDragged = false;
+        }, wasDragging ? 100 : 0);
+      });
+
+      // Drag over (for drop target)
+      nodeEl.addEventListener("dragover", (e) => {
+        if (!e.dataTransfer) return;
+        
+        // Check if this is an arbor node drag
+        if (!e.dataTransfer.types.includes("application/arbor-node-id")) {
+          return;
+        }
+
+        // All tree nodes can be drop targets (including root nodes)
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = "move";
+        
+        // Highlight as drop target
+        nodeEl.style.background = "rgba(45, 212, 167, 0.2)";
+        nodeEl.style.borderLeft = "3px solid #2dd4a7";
+      });
+
+      // Drag leave
+      nodeEl.addEventListener("dragleave", (e) => {
+        // Only remove highlight if we're actually leaving this element
+        const relatedTarget = e.relatedTarget as HTMLElement;
+        if (!nodeEl.contains(relatedTarget)) {
+          nodeEl.style.background = "";
+          nodeEl.style.borderLeft = "3px solid #2dd4a7";
+        }
+      });
+
+      // Drop
+      nodeEl.addEventListener("drop", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (!e.dataTransfer) return;
+
+        const draggedNodeId = e.dataTransfer.getData("application/arbor-node-id");
+        if (!draggedNodeId || draggedNodeId === nodeId) {
+          return;
+        }
+
+        // Remove highlight
+        nodeEl.style.background = "";
+        nodeEl.style.borderLeft = "3px solid #2dd4a7";
+
+        // Trigger reparent action
+        this.onSidebarAction("reparentNode", {
+          nodeId: draggedNodeId,
+          newParentId: nodeId,
+        });
+      });
+
+      // Click handler (for navigation) - only if not dragging
+      nodeEl.addEventListener("click", (e) => {
         // Don't navigate if clicking on delete button
         const target = e.target as HTMLElement;
         if (target.classList.contains("delete-node-btn") || target.closest(".delete-node-btn")) {
           return;
         }
 
-        const nodeId = (node as HTMLElement).dataset.nodeId;
+        // Don't navigate if we just dragged
+        if (hasDragged) {
+          return;
+        }
+
         if (nodeId) {
           this.onSidebarAction("navigateToNode", nodeId);
         }

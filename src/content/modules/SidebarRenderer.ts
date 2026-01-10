@@ -295,19 +295,20 @@ export class SidebarRenderer {
     }[node.platform];
 
     let html = `
-      <div class="tree-node" data-node-id="${nodeId}" style="
+      <div class="tree-node" data-node-id="${nodeId}" ${!isRootNode ? 'draggable="true"' : ''} style="
         padding: 10px 12px;
         margin: 4px 0;
         margin-left: ${indent}px;
         background: #1c2420;
         border-radius: 6px;
-        cursor: pointer;
+        cursor: ${isRootNode ? 'pointer' : 'grab'};
         border-left: 3px solid #2dd4a7;
         transition: all 0.2s ease;
         display: flex;
         justify-content: space-between;
         align-items: center;
         gap: 8px;
+        ${!isRootNode ? 'user-select: none;' : ''}
       ">
         <div style="flex: 1;">
           <div style="font-size: 13px; font-weight: 600; color: #e8efe9; margin-bottom: 4px;">

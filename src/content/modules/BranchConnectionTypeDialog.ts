@@ -87,7 +87,6 @@ export class BranchConnectionTypeDialog {
         value: "hybrid" as "hybrid" | "conversation" | "summary",
       };
       const selectedLength = { value: "full" as number | "full" };
-      const showAdvanced = { value: false };
 
       modal.innerHTML = `
         <div style="
@@ -116,7 +115,7 @@ export class BranchConnectionTypeDialog {
             box-shadow: 0 8px 24px rgba(0,0,0,0.6);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           ">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0;">
               <h2 style="color: #e8efe9; margin: 0; font-size: 18px; font-weight: 600;">🌿 Create Branch</h2>
               <button id="close-branch-dialog" style="
                 background: none;
@@ -135,7 +134,7 @@ export class BranchConnectionTypeDialog {
               " onmouseover="this.style.background='#2a3530'" onmouseout="this.style.background='transparent'">×</button>
             </div>
 
-            <p style="color: #9caba3; margin-bottom: 20px; font-size: 13px; line-height: 1.5;">
+            <p style="color: #9caba3; margin-bottom: 20px; font-size: 13px; line-height: 1.5; flex-shrink: 0;">
               Choose how this branch relates to the current conversation:
             </p>
 
@@ -143,7 +142,8 @@ export class BranchConnectionTypeDialog {
               flex: 1;
               overflow-y: auto;
               margin: 0 -24px;
-              padding: 0 24px;
+              padding: 0 24px 12px 24px;
+              min-height: 0;
             " id="branch-dialog-main-content">
               ${CONNECTION_TYPES.map(
                 (option, index) => `
@@ -224,45 +224,35 @@ export class BranchConnectionTypeDialog {
                   "
                 />
               </div>
-            </div>
 
-            <div style="
-              margin-top: 12px;
-              padding-top: 12px;
-              border-top: 1px solid #2a3530;
-            ">
-              <button id="toggle-advanced-options" style="
-                width: 100%;
-                padding: 8px 12px;
-                background: transparent;
-                color: #9caba3;
+              <div style="
+                margin-top: 12px;
+                padding-top: 12px;
+                border-top: 1px solid #2a3530;
+              ">
+                <div style="
+                  color: #9caba3;
+                  font-size: 11px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                  margin-bottom: 12px;
+                  font-weight: 600;
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                ">
+                  <span>⚙️</span>
+                  <span>Advanced Options</span>
+                </div>
+              </div>
+
+              <div id="advanced-options-section" style="
+                margin-top: 0;
+                padding: 16px;
+                background: #131917;
                 border: 1px solid #2a3530;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 12px;
-                font-weight: 600;
-                transition: all 0.2s ease;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 6px;
-              " onmouseover="this.style.background='#1c2420'; this.style.borderColor='#4a5854'" onmouseout="this.style.background='transparent'; this.style.borderColor='#2a3530'">
-                <span>⚙️</span>
-                <span>Advanced Options</span>
-                <span id="advanced-toggle-icon" style="margin-left: auto;">▼</span>
-              </button>
-            </div>
-
-            <div id="advanced-options-section" style="
-              margin-top: 12px;
-              padding: 16px;
-              background: #131917;
-              border: 1px solid #2a3530;
-              border-radius: 8px;
-              display: none;
-              max-height: 400px;
-              overflow-y: auto;
-            ">
+                border-radius: 8px;
+              ">
               <div style="margin-bottom: 16px;">
                 <label style="
                   display: block;
@@ -455,6 +445,7 @@ export class BranchConnectionTypeDialog {
                 </div>
               </div>
             </div>
+            </div>
 
             <div style="
               margin-top: 20px;
@@ -462,6 +453,7 @@ export class BranchConnectionTypeDialog {
               border-top: 1px solid #2a3530;
               display: flex;
               gap: 10px;
+              flex-shrink: 0;
             ">
               <button id="cancel-branch-dialog" style="
                 flex: 1;
@@ -499,21 +491,21 @@ export class BranchConnectionTypeDialog {
 
       document.body.appendChild(modal);
 
-      // Add custom scrollbar styling for advanced options
+      // Add custom scrollbar styling for dialog content
       const style = document.createElement("style");
       style.textContent = `
-        #advanced-options-section::-webkit-scrollbar {
+        #branch-dialog-main-content::-webkit-scrollbar {
           width: 8px;
         }
-        #advanced-options-section::-webkit-scrollbar-track {
+        #branch-dialog-main-content::-webkit-scrollbar-track {
           background: #131917;
           border-radius: 4px;
         }
-        #advanced-options-section::-webkit-scrollbar-thumb {
+        #branch-dialog-main-content::-webkit-scrollbar-thumb {
           background: #2a3530;
           border-radius: 4px;
         }
-        #advanced-options-section::-webkit-scrollbar-thumb:hover {
+        #branch-dialog-main-content::-webkit-scrollbar-thumb:hover {
           background: #4a5854;
         }
       `;
@@ -596,24 +588,10 @@ export class BranchConnectionTypeDialog {
         });
       });
 
-      // Handle advanced options toggle
+      // Advanced options are always visible now
       const advancedSection = modal.querySelector(
         "#advanced-options-section"
       ) as HTMLElement;
-      const toggleButton = modal.querySelector("#toggle-advanced-options");
-      const toggleIcon = modal.querySelector(
-        "#advanced-toggle-icon"
-      ) as HTMLElement;
-
-      toggleButton?.addEventListener("click", () => {
-        showAdvanced.value = !showAdvanced.value;
-        if (advancedSection) {
-          advancedSection.style.display = showAdvanced.value ? "block" : "none";
-          if (toggleIcon) {
-            toggleIcon.textContent = showAdvanced.value ? "▲" : "▼";
-          }
-        }
-      });
 
       // Handle format type selection - also get initial checked value
       const contextWarning = modal.querySelector(
@@ -684,7 +662,8 @@ export class BranchConnectionTypeDialog {
             if (contextWarning) contextWarning.style.display = "block";
             if (messageCountSection)
               messageCountSection.style.display = "block";
-            if (customPromptSection) customPromptSection.style.display = "block";
+            if (customPromptSection)
+              customPromptSection.style.display = "block";
             updateTokenEstimate(parseInt(messageCountInput?.value || "6", 10));
           } else {
             if (contextWarning) contextWarning.style.display = "none";
@@ -700,7 +679,8 @@ export class BranchConnectionTypeDialog {
             if (contextWarning) contextWarning.style.display = "block";
             if (messageCountSection)
               messageCountSection.style.display = "block";
-            if (customPromptSection) customPromptSection.style.display = "block";
+            if (customPromptSection)
+              customPromptSection.style.display = "block";
             updateTokenEstimate(parseInt(messageCountInput?.value || "6", 10));
           } else {
             if (contextWarning) contextWarning.style.display = "none";
@@ -751,7 +731,9 @@ export class BranchConnectionTypeDialog {
           if (selectedType.value === "custom") {
             const customValue = customConnectionInput?.value.trim();
             if (!customValue) {
-              alert("Please enter a custom connection type label or select a different connection type.");
+              alert(
+                "Please enter a custom connection type label or select a different connection type."
+              );
               return;
             }
           }
