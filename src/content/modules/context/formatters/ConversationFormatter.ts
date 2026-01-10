@@ -2,7 +2,11 @@
  * ConversationFormatter - Full conversation format with proper structure
  */
 
-import type { ContextFormatter, FormatOptions, Message } from "../ContextFormatter";
+import type {
+  ContextFormatter,
+  FormatOptions,
+  Message,
+} from "../ContextFormatter";
 import { MessageProcessor } from "../MessageProcessor";
 
 export class ConversationFormatter implements ContextFormatter {

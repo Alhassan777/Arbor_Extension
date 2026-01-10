@@ -1,33 +1,10 @@
 // Background service worker for Arbor extension
 
 import { logger } from "../utils/logger";
-import { retryWithBackoff, isNetworkError } from "../utils/retry";
+import { retryWithBackoff } from "../utils/retry";
 import { getApiKey } from "../storage/apiKeyStorage";
 
 logger.debug("Background script loaded");
-
-/**
- * Check network connectivity
- */
-async function checkNetworkConnectivity(): Promise<boolean> {
-  try {
-    // Try to fetch a small resource with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-    const response = await fetch("https://www.google.com/favicon.ico", {
-      method: "HEAD",
-      signal: controller.signal,
-      cache: "no-cache",
-    });
-
-    clearTimeout(timeoutId);
-    return response.ok;
-  } catch (error) {
-    logger.debug("Network connectivity check failed:", error);
-    return false;
-  }
-}
 
 // Listen for extension installation
 chrome.runtime.onInstalled.addListener((details) => {
@@ -170,14 +147,6 @@ async function handleGeminiAPICall(payload: {
     maxTokens = 2048,
   } = payload;
 
-  // Check network connectivity first
-  const isOnline = await checkNetworkConnectivity();
-  if (!isOnline) {
-    throw new Error(
-      "Network connection unavailable. Please check your internet connection."
-    );
-  }
-
   // Get API key from secure storage (decrypted)
   const apiKey = await getApiKey();
   if (!apiKey) {
@@ -192,6 +161,7 @@ async function handleGeminiAPICall(payload: {
   }
 
   // Use retry logic for API call
+  // The fetch will naturally handle network errors, and retry logic will catch them
   return retryWithBackoff(
     async () => {
       // Build Gemini API request
@@ -215,13 +185,24 @@ async function handleGeminiAPICall(payload: {
 
       logger.debug("Calling Gemini API (model:", model + ")");
 
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
+      } catch (error) {
+        // Handle network errors (fetch failures)
+        if (error instanceof TypeError && error.message.includes("fetch")) {
+          throw new Error(
+            "Network connection unavailable. Please check your internet connection."
+          );
+        }
+        throw error;
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -292,43 +273,44 @@ async function handleGeminiKeyValidation(apiKey?: string): Promise<{
     };
   }
 
-  // Check network connectivity first
-  const isOnline = await checkNetworkConnectivity();
-  if (!isOnline) {
-    return {
-      success: false,
-      valid: false,
-      error:
-        "Network connection unavailable. Please check your internet connection.",
-    };
-  }
-
   try {
     // Make a lightweight test request with retry logic
+    // Network errors will be caught by the fetch and retry logic
     return await retryWithBackoff(
       async () => {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
 
-        const response = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: "test",
-                  },
-                ],
-              },
-            ],
-            generationConfig: {
-              maxOutputTokens: 1,
+        let response: Response;
+        try {
+          response = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
             },
-          }),
-        });
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: "test",
+                    },
+                  ],
+                },
+              ],
+              generationConfig: {
+                maxOutputTokens: 1,
+              },
+            }),
+          });
+        } catch (error) {
+          // Handle network errors (fetch failures)
+          if (error instanceof TypeError && error.message.includes("fetch")) {
+            throw new Error(
+              "Network connection unavailable. Please check your internet connection."
+            );
+          }
+          throw error;
+        }
 
         if (response.ok) {
           return { success: true, valid: true };

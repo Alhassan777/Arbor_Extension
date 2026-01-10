@@ -2,7 +2,11 @@
  * HybridFormatter - Combines brief summary with last few full message pairs
  */
 
-import type { ContextFormatter, FormatOptions, Message } from "../ContextFormatter";
+import type {
+  ContextFormatter,
+  FormatOptions,
+  Message,
+} from "../ContextFormatter";
 import { MessageProcessor } from "../MessageProcessor";
 
 export class HybridFormatter implements ContextFormatter {
@@ -41,7 +45,9 @@ export class HybridFormatter implements ContextFormatter {
 
     // Add recent conversation pairs
     if (lastPairs.length > 0) {
-      context += `Recent conversation (last ${lastPairs.length} message pair${lastPairs.length !== 1 ? "s" : ""}):\n\n`;
+      context += `Recent conversation (last ${lastPairs.length} message pair${
+        lastPairs.length !== 1 ? "s" : ""
+      }):\n\n`;
 
       lastPairs.forEach((pair, index) => {
         if (pair.user) {

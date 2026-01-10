@@ -88,7 +88,9 @@ export class BranchContextManager {
             `🌳 Arbor: ❌ LLM service (${serviceType}) is not available`
           );
           console.log(`🌳 Arbor: 💡 Will use text-based summary fallback`);
-          console.log(`🌳 Arbor: 💡 Configure your Gemini API key in extension settings`);
+          console.log(
+            `🌳 Arbor: 💡 Configure your Gemini API key in extension settings`
+          );
         }
       } else {
         console.log(
@@ -125,7 +127,8 @@ export class BranchContextManager {
       } = options;
 
       // Get all messages from the current chat (we'll process them in the formatter)
-      if (progressCallback) progressCallback("Extracting messages from conversation...");
+      if (progressCallback)
+        progressCallback("Extracting messages from conversation...");
       const allMessages = this.platformInstance.extractMessages();
 
       // Convert to Message format
@@ -149,7 +152,8 @@ export class BranchContextManager {
       // Ensure we're using the correct formatter for summary mode
       if (formatType === "summary" && formatter instanceof SummaryFormatter) {
         try {
-          if (progressCallback) progressCallback("Summarizing with Gemini AI...");
+          if (progressCallback)
+            progressCallback("Summarizing with Gemini AI...");
           const result = await formatter.formatAsync(messages, {
             parentTitle,
             selectedText,
@@ -160,7 +164,8 @@ export class BranchContextManager {
           });
           context = result.context;
           truncationInfo = result.truncationInfo;
-          if (progressCallback) progressCallback("Context generated successfully!");
+          if (progressCallback)
+            progressCallback("Context generated successfully!");
         } catch (error) {
           // Fallback: try to get LLM service dynamically and retry, or use text-based
           try {

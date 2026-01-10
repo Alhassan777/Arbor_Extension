@@ -415,7 +415,10 @@ class ArborExtension {
             this.showNotification("Node reparented! 🔄", "success");
             this.refresh();
           } else {
-            this.showNotification("Cannot reparent node (would create cycle or invalid structure)", "error");
+            this.showNotification(
+              "Cannot reparent node (would create cycle or invalid structure)",
+              "error"
+            );
           }
         }
         break;
