@@ -28,28 +28,12 @@ module.exports = {
     filename: '[name].js',
     path: path.resolve(__dirname, 'dist'),
     clean: true,
+    publicPath: '', // Required for content scripts - prevents automatic publicPath detection
   },
   optimization: {
-    splitChunks: {
-      chunks: (chunk) => {
-        // Don't code-split the background script
-        // Service workers can't load dynamic chunks via import()
-        // Bundle everything into background.js
-        return chunk.name !== 'background';
-      },
-      cacheGroups: {
-        default: {
-          minChunks: 2,
-          priority: -20,
-          reuseExistingChunk: true,
-        },
-        vendors: {
-          test: /[\\/]node_modules[\\/]/,
-          priority: -10,
-          reuseExistingChunk: true,
-        },
-      },
-    },
+    // Disable code splitting completely - content scripts can't load dynamic chunks
+    splitChunks: false,
+    runtimeChunk: false,
   },
   plugins: [
     new webpack.DefinePlugin({

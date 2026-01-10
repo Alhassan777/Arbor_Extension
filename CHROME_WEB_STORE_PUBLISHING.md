@@ -59,8 +59,6 @@ The `unlimitedStorage` permission is necessary because users may create extensiv
 
 3. **Perplexity Domain** (`perplexity.ai/*`): Requested for future support of Perplexity conversations. Currently not used, but included for planned multi-platform support.
 
-4. **Google Gemini API** (`generativelanguage.googleapis.com/*`): This permission is required for Arbor's optional AI-powered context generation feature. When users provide their own Gemini API key, the extension makes API calls directly from the user's browser to Google's Gemini API to generate conversation summaries when creating branches. This is a user-initiated, optional feature that requires the user to provide their own API key.
-
 All host permissions serve the single purpose of organizing and managing conversations. Data is processed locally, and API calls (when used) go directly from the user's browser to the service (Google Gemini API) using the user's own credentials.
 
 ---

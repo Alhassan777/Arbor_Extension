@@ -23,6 +23,7 @@ import {
   BranchConnectionTypeDialog,
   type BranchDialogResult,
 } from "./modules/BranchConnectionTypeDialog";
+import { formatErrorForUI } from "../utils/errorMessages";
 import type { ExtensionState, ChatTree, ConnectionType } from "../types";
 import type { AvailableChat } from "./modules/ChatDetector";
 
@@ -501,8 +502,7 @@ class ArborExtension {
       loadingNotification.remove();
 
       if (!result.success) {
-        // Import error message utility for user-friendly errors
-        const { formatErrorForUI } = await import("../utils/errorMessages");
+        // Use error message utility for user-friendly errors
         const errorMessage = formatErrorForUI(result.error);
 
         // If clipboard copy failed, show the context in an alert as fallback
@@ -531,8 +531,7 @@ class ArborExtension {
       // Remove loading notification on error
       loadingNotification.remove();
 
-      // Import error message utility for user-friendly errors
-      const { formatErrorForUI } = await import("../utils/errorMessages");
+      // Use error message utility for user-friendly errors
       const errorMessage = formatErrorForUI(error);
       this.showNotification(
         `Failed to create branch context: ${errorMessage}`,
