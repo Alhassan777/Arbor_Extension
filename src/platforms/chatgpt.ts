@@ -138,9 +138,123 @@ export class ChatGPTPlatform implements Platform {
 
   /**
    * Open a new chat (navigates to home then opens new chat)
+   * If context is provided, it will be automatically pasted into the new chat
    */
-  openNewChat(): void {
+  openNewChat(context?: string, parentNodeId?: string, parentTreeId?: string): void {
+    // Store context and parent info for auto-pasting after navigation
+    if (context) {
+      sessionStorage.setItem('arbor_branch_context', context);
+      if (parentNodeId) {
+        sessionStorage.setItem('arbor_branch_parent_node_id', parentNodeId);
+      }
+      if (parentTreeId) {
+        sessionStorage.setItem('arbor_branch_parent_tree_id', parentTreeId);
+      }
+      sessionStorage.setItem('arbor_branch_timestamp', Date.now().toString());
+    }
     window.location.href = 'https://chatgpt.com/';
+  }
+
+  /**
+   * Paste text into ChatGPT's input field
+   * This method finds the textarea and programmatically inserts the text
+   */
+  async pasteIntoInput(text: string): Promise<boolean> {
+    try {
+      // Wait for the page to be ready and input field to be available
+      const maxAttempts = 30;
+      let attempts = 0;
+      
+      while (attempts < maxAttempts) {
+        // Try multiple selectors for ChatGPT's input field
+        // ChatGPT uses various selectors depending on the version
+        const selectors = [
+          'textarea[data-id="root"]', // Common ChatGPT textarea selector
+          'textarea[placeholder*="Message"]', // Placeholder-based selector
+          'textarea[placeholder*="message"]',
+          'textarea[placeholder*="Send a message"]',
+          'textarea[id*="prompt"]',
+          'textarea[role="textbox"]',
+          'textarea[tabindex="0"]', // Often the main input
+          'textarea', // Fallback to any textarea
+        ];
+
+        let textarea: HTMLTextAreaElement | null = null;
+        
+        for (const selector of selectors) {
+          const elements = document.querySelectorAll(selector);
+          for (const element of Array.from(elements)) {
+            if (element instanceof HTMLTextAreaElement) {
+              // Check if it's visible and enabled, and likely the main input
+              const rect = element.getBoundingClientRect();
+              if (rect.width > 0 && rect.height > 0 && !element.disabled) {
+                // Prefer textareas that are in the main content area
+                const isMainInput = element.offsetParent !== null && 
+                                  (rect.top > 0 && rect.left > 0);
+                if (isMainInput) {
+                  textarea = element;
+                  break;
+                }
+              }
+            }
+          }
+          if (textarea) break;
+        }
+
+        if (textarea) {
+          // Focus the textarea first
+          textarea.focus();
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Get the native value setter to properly update React-controlled inputs
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLTextAreaElement.prototype,
+            'value'
+          )?.set;
+          
+          // Set the value using native setter (for React)
+          if (nativeInputValueSetter) {
+            nativeInputValueSetter.call(textarea, text);
+          } else {
+            textarea.value = text;
+          }
+          
+          // Trigger multiple events to ensure React picks up the change
+          const events = ['input', 'change', 'keydown', 'keyup'];
+          for (const eventType of events) {
+            const event = new Event(eventType, { bubbles: true, cancelable: true });
+            textarea.dispatchEvent(event);
+          }
+          
+          // Also try React's synthetic event system
+          const reactInputEvent = new Event('input', { bubbles: true });
+          Object.defineProperty(reactInputEvent, 'target', {
+            value: textarea,
+            enumerable: true,
+          });
+          textarea.dispatchEvent(reactInputEvent);
+          
+          // Set selection to end of text
+          textarea.setSelectionRange(text.length, text.length);
+          
+          // Focus again to ensure it's active
+          textarea.focus();
+
+          console.log('🌳 Arbor: Context pasted into input field');
+          return true;
+        }
+
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 200));
+        attempts++;
+      }
+
+      console.warn('🌳 Arbor: Could not find input field to paste context');
+      return false;
+    } catch (error) {
+      console.error('🌳 Arbor: Error pasting into input:', error);
+      return false;
+    }
   }
 
   /**

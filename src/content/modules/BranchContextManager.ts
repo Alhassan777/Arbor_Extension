@@ -232,9 +232,10 @@ export class BranchContextManager {
 
   /**
    * Open a new chat in the current platform
+   * If context is provided, it will be automatically pasted into the new chat
    */
-  openNewChat(): void {
-    this.platformInstance.openNewChat();
+  openNewChat(context?: string, parentNodeId?: string, parentTreeId?: string): void {
+    this.platformInstance.openNewChat(context, parentNodeId, parentTreeId);
   }
 
   /**

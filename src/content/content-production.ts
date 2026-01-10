@@ -129,10 +129,52 @@ class ArborExtension {
     this.setupSidebarObserver();
     this.scanAvailableChats();
     this.detectAndTrackCurrentChat();
+    this.handleAutoPasteAndTreeAddition();
+    this.setupNavigationListener();
 
     // Periodic updates
     setInterval(() => this.scanAvailableChats(), 10000);
     setInterval(() => this.detectAndTrackCurrentChat(), 5000);
+  }
+
+  /**
+   * Set up navigation listener to detect when new chats are created
+   */
+  private setupNavigationListener() {
+    if (this.platform === "chatgpt") {
+      let lastChatId: string | null = chatgptPlatform.getChatId();
+
+      chatgptPlatform.onNavigationChange((chatId) => {
+        // Chat ID changed - might be a new chat from branch creation
+        if (chatId !== lastChatId) {
+          lastChatId = chatId;
+
+          // Check if we have branch context to handle
+          const parentNodeId = sessionStorage.getItem(
+            "arbor_branch_parent_node_id"
+          );
+          const parentTreeId = sessionStorage.getItem(
+            "arbor_branch_parent_tree_id"
+          );
+          const timestamp = sessionStorage.getItem("arbor_branch_timestamp");
+
+          // Only process if we have the required info and it's recent (within 5 minutes)
+          if (parentNodeId && parentTreeId && chatId && timestamp) {
+            const branchTime = parseInt(timestamp, 10);
+            const now = Date.now();
+            if (now - branchTime <= 5 * 60 * 1000) {
+              // Wait a bit for the chat to fully load
+              setTimeout(async () => {
+                await this.addNewChatToTreeIfNeeded(parentNodeId, parentTreeId);
+              }, 2000);
+            } else {
+              // Too old, clear it
+              this.clearBranchContext();
+            }
+          }
+        }
+      });
+    }
   }
 
   private setupSidebarObserver() {
@@ -537,15 +579,44 @@ class ArborExtension {
         return;
       }
 
+      // Get the current chat node ID if it exists in the tree
+      let parentNodeId: string | undefined;
+      let parentTreeId: string | undefined;
+
+      if (this.state.currentTreeId) {
+        const tree = this.state.trees[this.state.currentTreeId];
+        if (tree) {
+          parentTreeId = this.state.currentTreeId;
+          // Find the node that matches the current chat URL
+          const currentChatUrl =
+            this.platform === "chatgpt"
+              ? chatgptPlatform.detectCurrentChatUrl()
+              : currentChat.url;
+
+          if (currentChatUrl) {
+            const matchingNode = Object.values(tree.nodes).find(
+              (node) => node.url === currentChatUrl
+            );
+            if (matchingNode) {
+              parentNodeId = matchingNode.id;
+            }
+          }
+        }
+      }
+
       // Show success notification
       this.showNotification(
-        "Context copied! Opening new chat - paste (Ctrl+V) to continue",
+        "Opening new chat and pasting context automatically...",
         "success"
       );
 
-      // Open new chat after a short delay
+      // Open new chat with context and parent info
       setTimeout(() => {
-        this.branchContextManager.openNewChat();
+        this.branchContextManager.openNewChat(
+          result.context,
+          parentNodeId,
+          parentTreeId
+        );
       }, 1000);
     } catch (error) {
       // Remove loading notification on error
@@ -714,7 +785,7 @@ class ArborExtension {
     this.refresh();
   }
 
-  private async addChatToTree(chatUrl: string) {
+  private async addChatToTree(chatUrl: string, parentNodeId?: string | null) {
     if (!this.state.currentTreeId) {
       this.showNotification("No active tree selected", "error");
       return;
@@ -736,8 +807,12 @@ class ArborExtension {
     }
 
     const tree = this.state.trees[this.state.currentTreeId];
+
+    // Use provided parentNodeId, or default to root
+    const targetParentId = parentNodeId || tree.rootNodeId;
+
     await this.nodeManager.createNode(
-      tree.rootNodeId,
+      targetParentId,
       chat.title,
       chat.url,
       chat.platform,
@@ -748,6 +823,158 @@ class ArborExtension {
     this.showNotification(`Added "${chat.title}" to tree! ✅`, "success");
     this.refresh();
     this.renderGraph();
+  }
+
+  /**
+   * Handle auto-pasting context and adding new chat to tree after branch creation
+   */
+  private async handleAutoPasteAndTreeAddition() {
+    try {
+      // Check if we have stored context from branch creation
+      const context = sessionStorage.getItem("arbor_branch_context");
+      const parentNodeId = sessionStorage.getItem(
+        "arbor_branch_parent_node_id"
+      );
+      const parentTreeId = sessionStorage.getItem(
+        "arbor_branch_parent_tree_id"
+      );
+      const timestamp = sessionStorage.getItem("arbor_branch_timestamp");
+
+      if (!context || !timestamp) {
+        return; // No branch context to handle
+      }
+
+      // Check if this is a recent branch creation (within last 5 minutes)
+      const branchTime = parseInt(timestamp, 10);
+      const now = Date.now();
+      if (now - branchTime > 5 * 60 * 1000) {
+        // Too old, clear it
+        this.clearBranchContext();
+        return;
+      }
+
+      // If we're on the home page (new chat), paste the context
+      if (this.platform === "chatgpt" && !chatgptPlatform.isInConversation()) {
+        // Wait a bit for the page to fully load
+        setTimeout(async () => {
+          const pasted = await chatgptPlatform.pasteIntoInput(context);
+          if (pasted) {
+            console.log("🌳 Arbor: Context pasted successfully");
+            this.showNotification(
+              "Context pasted! Send a message to create the branch.",
+              "success"
+            );
+          } else {
+            console.warn(
+              "🌳 Arbor: Failed to paste context, user will need to paste manually"
+            );
+            this.showNotification(
+              "Context is in clipboard - paste (Ctrl+V) to continue",
+              "info"
+            );
+          }
+        }, 1000);
+        // Navigation listener will handle adding to tree when chat is created
+      } else if (
+        this.platform === "chatgpt" &&
+        chatgptPlatform.isInConversation()
+      ) {
+        // We're already in a conversation - this might be the new chat
+        // Wait a bit and then add it to the tree
+        setTimeout(async () => {
+          await this.addNewChatToTreeIfNeeded(parentNodeId, parentTreeId);
+        }, 2000);
+      }
+    } catch (error) {
+      console.error("🌳 Arbor: Error handling auto-paste:", error);
+    }
+  }
+
+  /**
+   * Add the current chat to the tree if it's not already there
+   */
+  private async addNewChatToTreeIfNeeded(
+    parentNodeId: string | null,
+    parentTreeId: string | null
+  ) {
+    try {
+      if (!parentNodeId || !parentTreeId) {
+        this.clearBranchContext();
+        return;
+      }
+
+      // Get current chat URL
+      const currentChatUrl =
+        this.platform === "chatgpt"
+          ? chatgptPlatform.detectCurrentChatUrl()
+          : window.location.href;
+
+      if (!currentChatUrl) {
+        return;
+      }
+
+      // Check if we need to switch to the parent tree
+      if (this.state.currentTreeId !== parentTreeId) {
+        this.state.currentTreeId = parentTreeId;
+        await this.saveState();
+      }
+
+      // Check if this chat is already in the tree
+      const tree = this.state.trees[parentTreeId];
+      if (!tree) {
+        console.warn("🌳 Arbor: Parent tree not found");
+        this.clearBranchContext();
+        return;
+      }
+
+      const existingNode = Object.values(tree.nodes).find(
+        (node) => node.url === currentChatUrl
+      );
+
+      if (existingNode) {
+        // Chat is already in the tree
+        console.log("🌳 Arbor: Chat already in tree");
+        this.clearBranchContext();
+        return;
+      }
+
+      // Get chat title
+      const chatTitle =
+        this.platform === "chatgpt"
+          ? chatgptPlatform.detectChatTitle() || "New Branch"
+          : "New Branch";
+
+      // Add the chat to the tree as a child of the parent
+      await this.nodeManager.createNode(
+        parentNodeId,
+        chatTitle,
+        currentChatUrl,
+        this.platform,
+        tree,
+        parentTreeId
+      );
+
+      this.showNotification(
+        `Branch "${chatTitle}" added to tree! 🌿`,
+        "success"
+      );
+      this.refresh();
+      this.renderGraph();
+      this.clearBranchContext();
+    } catch (error) {
+      console.error("🌳 Arbor: Error adding new chat to tree:", error);
+      this.clearBranchContext();
+    }
+  }
+
+  /**
+   * Clear stored branch context from sessionStorage
+   */
+  private clearBranchContext() {
+    sessionStorage.removeItem("arbor_branch_context");
+    sessionStorage.removeItem("arbor_branch_parent_node_id");
+    sessionStorage.removeItem("arbor_branch_parent_tree_id");
+    sessionStorage.removeItem("arbor_branch_timestamp");
   }
 
   private async handleNodeClick(nodeId: string) {

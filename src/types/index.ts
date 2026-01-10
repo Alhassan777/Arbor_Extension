@@ -66,7 +66,7 @@ export interface Platform {
   detectChatTitle(): string | null;
   isInConversation(): boolean;
   getSelectedText(): string | null;
-  openNewChat(): void;
+  openNewChat(context?: string, parentNodeId?: string, parentTreeId?: string): void;
   navigateToChat(chatId: string): void;
   generateBranchContext(params: {
     parentTitle: string;
