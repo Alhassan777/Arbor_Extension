@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    #arbor-sidebar-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 320px;
+      height: 100vh;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      z-index: 999999;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
+    }
+
+    #arbor-graph-container {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 400px;
+      height: 100vh;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      z-index: 999999;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      box-shadow: -2px 0 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .arbor-header {
+      padding: 16px;
+      border-bottom: 1px solid #333;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .arbor-header h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .arbor-toggle-btn {
+      background: #333;
+      border: none;
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .arbor-toggle-btn:hover {
+      background: #444;
+    }
+
+    .arbor-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+
+    .tree-node {
+      padding: 10px 12px;
+      margin: 4px 0;
+      background: #252525;
+      border-radius: 6px;
+      cursor: pointer;
+      border-left: 3px solid #4a9eff;
+      transition: all 0.2s;
+    }
+
+    .tree-node:hover {
+      background: #2a2a2a;
+      border-left-color: #6bb3ff;
+    }
+
+    .tree-node.active {
+      background: #2d3748;
+      border-left-color: #4a9eff;
+    }
+
+    .tree-node-title {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 4px;
+      color: #fff;
+    }
+
+    .tree-node-meta {
+      font-size: 11px;
+      color: #999;
+      display: flex;
+      gap: 8px;
+    }
+
+    .tree-node-children {
+      margin-left: 16px;
+      border-left: 1px solid #333;
+      padding-left: 8px;
+    }
+
+    .action-buttons {
+      padding: 12px;
+      border-top: 1px solid #333;
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 10px;
+      background: #4a9eff;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    .btn:hover {
+      background: #3a8eef;
+    }
+
+    .btn-secondary {
+      background: #333;
+    }
+
+    .btn-secondary:hover {
+      background: #444;
+    }
+
+    .graph-canvas {
+      width: 100%;
+      height: 100%;
+      background: #0d0d0d;
+      position: relative;
+    }
+
+    .graph-node {
+      position: absolute;
+      background: #252525;
+      border: 2px solid #4a9eff;
+      border-radius: 8px;
+      padding: 12px;
+      min-width: 120px;
+      cursor: move;
+    }
+
+    .graph-node-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .graph-node-platform {
+      font-size: 10px;
+      color: #999;
+    }
+
+    .connection-line {
+      position: absolute;
+      height: 2px;
+      background: #4a9eff;
+      transform-origin: left center;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #666;
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .empty-state-text {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <!-- Left Sidebar: Tree View -->
+  <div id="arbor-sidebar-container">
+    <div class="arbor-header">
+      <h2>🌳 Arbor Trees</h2>
+      <button class="arbor-toggle-btn" id="toggle-sidebar">Hide</button>
+    </div>
+    <div class="arbor-content" id="tree-view">
+      <!-- Tree nodes will be rendered here -->
+    </div>
+    <div class="action-buttons">
+      <button class="btn" id="add-current-chat">+ Add Current Chat</button>
+      <button class="btn btn-secondary" id="create-branch">Branch</button>
+    </div>
+  </div>
+
+  <!-- Right Sidebar: Graph View -->
+  <div id="arbor-graph-container">
+    <div class="arbor-header">
+      <h2>📊 Graph View</h2>
+      <button class="arbor-toggle-btn" id="toggle-graph">Hide</button>
+    </div>
+    <div class="arbor-content">
+      <div class="graph-canvas" id="graph-canvas">
+        <!-- Graph will be rendered here -->
+      </div>
+    </div>
+  </div>
+</body>
+</html>

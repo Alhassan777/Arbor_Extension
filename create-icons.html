@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Create Arbor Icons</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 40px;
+      text-align: center;
+    }
+    canvas {
+      margin: 20px;
+      border: 1px solid #ddd;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Arbor Icon Generator</h1>
+  <p>Click the buttons below to download icons for the extension</p>
+
+  <canvas id="canvas16" width="16" height="16"></canvas>
+  <canvas id="canvas48" width="48" height="48"></canvas>
+  <canvas id="canvas128" width="128" height="128"></canvas>
+
+  <br>
+
+  <button onclick="downloadIcon(16)">Download 16x16</button>
+  <button onclick="downloadIcon(48)">Download 48x48</button>
+  <button onclick="downloadIcon(128)">Download 128x128</button>
+
+  <script>
+    function drawIcon(size) {
+      const canvas = document.getElementById(`canvas${size}`);
+      const ctx = canvas.getContext('2d');
+
+      // Background
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(0, 0, size, size);
+
+      // Draw tree emoji style
+      ctx.font = `${size * 0.7}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🌳', size / 2, size / 2);
+    }
+
+    function downloadIcon(size) {
+      const canvas = document.getElementById(`canvas${size}`);
+      const link = document.createElement('a');
+      link.download = `icon${size}.png`;
+      link.href = canvas.toDataURL();
+      link.click();
+    }
+
+    // Draw all icons on load
+    [16, 48, 128].forEach(size => drawIcon(size));
+  </script>
+
+  <hr style="margin: 40px 0;">
+
+  <h2>Instructions:</h2>
+  <ol style="text-align: left; max-width: 600px; margin: 0 auto;">
+    <li>Click each download button above</li>
+    <li>Save the files to <code>extension/public/icons/</code></li>
+    <li>Make sure they're named exactly: <code>icon16.png</code>, <code>icon48.png</code>, <code>icon128.png</code></li>
+    <li>Or skip this - the extension works without icons!</li>
+  </ol>
+</body>
+</html>
