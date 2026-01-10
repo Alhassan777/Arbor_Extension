@@ -183,7 +183,7 @@ export class BranchConnectionTypeDialog {
                     </div>
                     ${
                       option.type === defaultType
-                        ? '<span style="color: #2dd4a7; font-size: 16px; flex-shrink: 0;">✓</span>'
+                        ? '<span class="arbor-checkmark" style="color: #2dd4a7; font-size: 16px; flex-shrink: 0;">✓</span>'
                         : ""
                     }
                   </div>
@@ -543,30 +543,34 @@ export class BranchConnectionTypeDialog {
             }
           }
 
+          // Remove ALL checkmarks from ALL options first
+          modal.querySelectorAll(".arbor-checkmark").forEach((checkmark) => {
+            checkmark.remove();
+          });
+
           // Update visual selection
           modal.querySelectorAll(".connection-type-option").forEach((opt) => {
             const optEl = opt as HTMLElement;
             const optType = optEl.dataset.type as ConnectionType;
+            
             if (optType === type) {
               optEl.style.background = "#1c2420";
               optEl.style.borderColor = "#2dd4a7";
               optEl.style.boxShadow = "0 0 0 2px rgba(45, 212, 167, 0.2)";
-              // Add checkmark if not present
-              if (!optEl.querySelector('span[style*="color: #2dd4a7"]')) {
-                const checkmark = document.createElement("span");
-                checkmark.style.cssText =
-                  "color: #2dd4a7; font-size: 16px; flex-shrink: 0;";
-                checkmark.textContent = "✓";
-                optEl
-                  .querySelector("div[style*='display: flex']")
-                  ?.appendChild(checkmark);
+              // Add checkmark to selected option
+              const checkmark = document.createElement("span");
+              checkmark.className = "arbor-checkmark";
+              checkmark.style.cssText =
+                "color: #2dd4a7; font-size: 16px; flex-shrink: 0;";
+              checkmark.textContent = "✓";
+              const flexContainer = optEl.querySelector("div[style*='display: flex']");
+              if (flexContainer) {
+                flexContainer.appendChild(checkmark);
               }
             } else {
               optEl.style.background = "#131917";
               optEl.style.borderColor = "#2a3530";
               optEl.style.boxShadow = "";
-              // Remove checkmark
-              optEl.querySelector('span[style*="color: #2dd4a7"]')?.remove();
             }
           });
         });
