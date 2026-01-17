@@ -1080,18 +1080,26 @@ class ArborExtension {
     this.renderGraph();
   }
 
-  private showNotification(message: string, type: "success" | "error") {
+  private showNotification(message: string, type: "success" | "error" | "info") {
     console.log(`[${type.toUpperCase()}] ${message}`);
 
     // Simple toast notification
     const toast = document.createElement("div");
+    const backgroundColor = 
+      type === "success" ? "#2dd4a7" : 
+      type === "error" ? "#ef4444" : 
+      "#3b82f6"; // blue for info
+    const textColor = 
+      type === "success" ? "#0c0f0e" : 
+      "#fff"; // white for error and info
+    
     toast.style.cssText = `
         position: fixed;
       top: 20px;
       right: 20px;
       padding: 12px 20px;
-      background: ${type === "success" ? "#2dd4a7" : "#ef4444"};
-      color: ${type === "success" ? "#0c0f0e" : "#fff"};
+      background: ${backgroundColor};
+      color: ${textColor};
       border-radius: 8px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         z-index: 99999999;
