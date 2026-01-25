@@ -96,6 +96,14 @@ export class UIInjector {
       !sidebar.classList.contains("hidden")
     );
 
+    // Attach settings button listener in header (always visible)
+    const openSettingsFromSidebarBtn = document.getElementById("open-settings-from-sidebar-btn");
+    if (openSettingsFromSidebarBtn) {
+      openSettingsFromSidebarBtn.addEventListener("click", () => {
+        chrome.runtime.sendMessage({ action: "open-options-page" });
+      });
+    }
+
     // Attach settings button listener if API key notice is shown
     if (!hasApiKey) {
       const openSettingsBtn = document.getElementById("open-settings-btn");

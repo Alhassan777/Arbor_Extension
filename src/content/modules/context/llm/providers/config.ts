@@ -30,14 +30,16 @@ export interface ProviderConfig {
 
 export const PROVIDER_CONFIGS: Record<LLMProvider, ProviderConfig> = {
   gemini: {
-    defaultModel: "gemini-2.0-flash-exp",
+    defaultModel: "gemini-3-flash-preview",
     apiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
-    validationModel: "gemini-2.0-flash-exp",
+    validationModel: "gemini-3-flash-preview",
     models: [
-      { value: "gemini-2.0-flash-exp", label: "Gemini 2.0 Flash (Experimental)" },
-      { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
-      { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash" },
-      { value: "gemini-pro", label: "Gemini Pro" },
+      { value: "gemini-3-flash-preview", label: "Gemini 3 Flash (Preview) - Latest" },
+      { value: "gemini-3-pro-preview", label: "Gemini 3 Pro (Preview) - Most Intelligent" },
+      { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+      { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+      { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite" },
+      { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
     ],
     metadata: {
       name: "Google Gemini",
@@ -55,13 +57,20 @@ export const PROVIDER_CONFIGS: Record<LLMProvider, ProviderConfig> = {
     },
   },
   openai: {
-    defaultModel: "gpt-4o-mini",
+    defaultModel: "gpt-5.2",
     apiBaseUrl: "https://api.openai.com/v1",
     models: [
+      { value: "gpt-5.2", label: "GPT-5.2 - Latest (Best for Coding & Agents)" },
+      { value: "gpt-5.2-pro", label: "GPT-5.2 Pro - Smarter Version" },
+      { value: "gpt-5.1", label: "GPT-5.1" },
+      { value: "gpt-5", label: "GPT-5" },
+      { value: "gpt-5-mini", label: "GPT-5 Mini - Fast & Cost-Efficient" },
+      { value: "gpt-5-nano", label: "GPT-5 Nano - Fastest & Most Cost-Efficient" },
+      { value: "gpt-4.1", label: "GPT-4.1 - Smartest Non-Reasoning" },
       { value: "gpt-4o", label: "GPT-4o" },
       { value: "gpt-4o-mini", label: "GPT-4o Mini" },
       { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
-      { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
+      { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo - Legacy" },
     ],
     metadata: {
       name: "OpenAI",
@@ -79,13 +88,13 @@ export const PROVIDER_CONFIGS: Record<LLMProvider, ProviderConfig> = {
     },
   },
   anthropic: {
-    defaultModel: "claude-3-5-sonnet-20241022",
+    defaultModel: "claude-sonnet-4-5-20250929",
     apiBaseUrl: "https://api.anthropic.com/v1",
     models: [
-      { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
-      { value: "claude-3-opus-20240229", label: "Claude 3 Opus" },
-      { value: "claude-3-sonnet-20240229", label: "Claude 3 Sonnet" },
-      { value: "claude-3-haiku-20240307", label: "Claude 3 Haiku" },
+      { value: "claude-opus-4-5-20251101", label: "Claude Opus 4.5 - Most Intelligent (Nov 2025)" },
+      { value: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5 - Best Balance (Sep 2025)" },
+      { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5 - Fastest (Oct 2025)" },
+      { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet - Legacy" },
     ],
     metadata: {
       name: "Anthropic (Claude)",

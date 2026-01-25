@@ -44,9 +44,18 @@ export class SidebarRenderer {
           ${logoURL ? `<img src="${logoURL}" alt="Arbor" class="arbor-logo" />` : ""}
           <span>Arbor</span>
         </h2>
-        <button id="close-sidebar-btn" class="arbor-btn arbor-btn-ghost">
-          Close
-        </button>
+        <div class="arbor-header-actions">
+          <button id="open-settings-from-sidebar-btn" class="arbor-btn arbor-btn-ghost" title="Open Settings">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="margin-right: 4px;">
+              <path d="M8 10a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              <path d="M13.5 8c0 .5-.1 1-.3 1.4l1.4 1.1c.2.2.3.5.2.7l-1.3 2.3c-.1.2-.4.3-.6.2l-1.7-.7c-.4.3-.9.5-1.4.6v1.4c0 .3-.2.5-.5.5H7.8c-.3 0-.5-.2-.5-.5v-1.4c-.5-.1-1-.3-1.4-.6l-1.7.7c-.2.1-.5 0-.6-.2L2.3 11.9c-.1-.2 0-.5.2-.7l1.4-1.1c-.2-.4-.3-.9-.3-1.4s.1-1 .3-1.4L2.5 6.3c-.2-.2-.3-.5-.2-.7l1.3-2.3c.1-.2.4-.3.6-.2l1.7.7c.4-.3.9-.5 1.4-.6V1.5c0-.3.2-.5.5-.5h2.4c.3 0 .5.2.5.5v1.4c.5.1 1 .3 1.4.6l1.7-.7c.2-.1.5 0 .6.2l1.3 2.3c.1.2 0 .5-.2.7l-1.4 1.1c.2.4.3.9.3 1.4z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Settings
+          </button>
+          <button id="close-sidebar-btn" class="arbor-btn arbor-btn-ghost">
+            Close
+          </button>
+        </div>
       </div>
       <div class="arbor-content">
         ${

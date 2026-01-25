@@ -138,6 +138,19 @@ export class StyleInjector {
         flex-shrink: 0;
       }
 
+      .arbor-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+
+      .arbor-header-actions .arbor-btn {
+        display: flex;
+        align-items: center;
+        white-space: nowrap;
+      }
+
       /* Content Area */
       .arbor-content {
         flex: 1;

@@ -205,6 +205,39 @@ async function updateApiKeyBanner() {
 }
 
 /**
+ * Navigate back to chat platform
+ */
+async function navigateBackToChat() {
+  const platformUrls = [
+    "https://chatgpt.com",
+    "https://gemini.google.com/app",
+    "https://claude.ai/new",
+    "https://www.perplexity.ai",
+  ];
+
+  try {
+    // Try to find an existing tab with one of the supported platforms
+    const tabs = await chrome.tabs.query({});
+    const platformTab = tabs.find((tab) =>
+      tab.url && platformUrls.some((url) => tab.url?.startsWith(url))
+    );
+
+    if (platformTab && platformTab.id) {
+      // Switch to existing platform tab
+      await chrome.tabs.update(platformTab.id, { active: true });
+      await chrome.windows.update(platformTab.windowId || 0, { focused: true });
+    } else {
+      // Open new tab to ChatGPT (default)
+      await chrome.tabs.create({ url: "https://chatgpt.com" });
+    }
+  } catch (error) {
+    logger.error("Failed to navigate back to chat:", error);
+    // Fallback: open ChatGPT in new tab
+    window.open("https://chatgpt.com", "_blank");
+  }
+}
+
+/**
  * Initialize the page
  */
 async function init() {
@@ -213,6 +246,12 @@ async function init() {
 
   // Check and show API key missing banner
   await updateApiKeyBanner();
+
+  // Attach back to chat button listener
+  const backToChatBtn = document.getElementById("backToChatBtn");
+  if (backToChatBtn) {
+    backToChatBtn.addEventListener("click", navigateBackToChat);
+  }
 
   // Event listeners
   toggleVisibilityBtn.addEventListener("click", togglePasswordVisibility);
