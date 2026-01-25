@@ -132,8 +132,8 @@ export class StyleInjector {
       }
 
       .arbor-header .arbor-logo {
-        width: 24px;
-        height: 24px;
+        width: 32px;
+        height: 32px;
         object-fit: contain;
         flex-shrink: 0;
       }
@@ -149,6 +149,32 @@ export class StyleInjector {
         display: flex;
         align-items: center;
         white-space: nowrap;
+      }
+
+      /* Icon-only buttons for headers */
+      .arbor-icon-btn {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        color: var(--arbor-text-secondary);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+        flex-shrink: 0;
+      }
+
+      .arbor-icon-btn:hover {
+        background: var(--arbor-bg-elevated);
+        color: var(--arbor-text-primary);
+      }
+
+      .arbor-icon-btn:active {
+        transform: scale(0.95);
       }
 
       /* Content Area */
@@ -775,14 +801,30 @@ export class StyleInjector {
 
       /* Graph View */
       .arbor-graph-header {
-        padding: 16px 20px;
+        padding: 12px 16px;
         border-bottom: 1px solid var(--arbor-border-subtle);
         background: var(--arbor-bg-raised);
         display: flex;
-        justify-content: space-between;
         align-items: center;
-        flex-wrap: wrap;
-        gap: 12px;
+        justify-content: space-between;
+        gap: 16px;
+        min-height: 56px;
+      }
+
+      .arbor-graph-header-main {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .arbor-graph-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+        margin-left: auto;
       }
 
       .arbor-graph-title {
@@ -791,23 +833,28 @@ export class StyleInjector {
         font-weight: 500;
         color: var(--arbor-text-primary);
         white-space: nowrap;
+        flex-shrink: 0;
       }
 
       .arbor-zoom-controls {
         display: flex;
-        gap: 6px;
+        gap: 2px;
         align-items: center;
+        background: var(--arbor-bg-elevated);
+        border: 1px solid var(--arbor-border-default);
+        border-radius: 6px;
+        padding: 4px;
         flex-shrink: 0;
       }
 
       .arbor-zoom-btn {
-        min-width: 32px;
-        min-height: 32px;
+        width: 28px;
+        height: 28px;
         padding: 0;
-        background: var(--arbor-bg-raised);
+        background: transparent;
         color: var(--arbor-text-secondary);
-        border: 1px solid var(--arbor-border-default);
-        border-radius: 6px;
+        border: none;
+        border-radius: 4px;
         cursor: pointer;
         font-size: 16px;
         font-weight: 500;
@@ -817,31 +864,59 @@ export class StyleInjector {
         justify-content: center;
         transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
         user-select: none;
+        flex-shrink: 0;
       }
 
       .arbor-zoom-btn:hover {
-        background: var(--arbor-bg-elevated);
+        background: var(--arbor-bg-raised);
         color: var(--arbor-text-primary);
-        border-color: var(--arbor-border-strong);
+      }
+
+      .arbor-zoom-btn:active {
+        transform: scale(0.95);
+      }
+
+      .arbor-zoom-reset {
+        width: auto;
+        min-width: 28px;
+        padding: 0 6px;
+      }
+
+      .arbor-zoom-divider {
+        width: 1px;
+        height: 16px;
+        background: var(--arbor-border-default);
+        margin: 0 2px;
       }
 
       .arbor-zoom-level {
         font-size: 12px;
         color: var(--arbor-text-secondary);
-        min-width: 50px;
+        min-width: 42px;
         text-align: center;
         font-weight: 500;
         padding: 0 4px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .arbor-header-action {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: auto;
+        padding: 6px 12px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .arbor-icon-reset {
+        font-size: 14px;
+        line-height: 1;
       }
 
       /* Reset Layout Button */
-      #reset-layout-btn {
-        display: none;
-      }
-
       #reset-layout-btn:hover {
         background: var(--arbor-bg-elevated);
-        border-color: var(--arbor-primary-muted);
         color: var(--arbor-primary);
       }
 

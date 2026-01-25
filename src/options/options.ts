@@ -4,7 +4,10 @@
  */
 
 import { ConfigManager } from "./configManager";
-import { AVAILABLE_MODELS, type LLMProvider } from "../content/modules/context/llm/LLMServiceFactory";
+import {
+  AVAILABLE_MODELS,
+  type LLMProvider,
+} from "../content/modules/context/llm/LLMServiceFactory";
 import { getProviderMetadata } from "../content/modules/context/llm/providers/config";
 import { logger } from "../utils/logger";
 
@@ -13,20 +16,34 @@ const configForm = document.getElementById("configForm") as HTMLFormElement;
 const providerSelect = document.getElementById("provider") as HTMLSelectElement;
 const modelSelect = document.getElementById("model") as HTMLSelectElement;
 const modelGroup = document.getElementById("modelGroup") as HTMLDivElement;
-const apiKeySection = document.getElementById("apiKeySection") as HTMLDivElement;
+const apiKeySection = document.getElementById(
+  "apiKeySection",
+) as HTMLDivElement;
 const apiKeyInput = document.getElementById("apiKey") as HTMLInputElement;
 const apiKeyLabel = document.getElementById("apiKeyLabel") as HTMLLabelElement;
 const apiKeyHelp = document.getElementById("apiKeyHelp") as HTMLElement;
-const toggleVisibilityBtn = document.getElementById("toggleVisibility") as HTMLButtonElement;
+const toggleVisibilityBtn = document.getElementById(
+  "toggleVisibility",
+) as HTMLButtonElement;
 const saveBtn = document.getElementById("saveBtn") as HTMLButtonElement;
 const saveBtnText = document.getElementById("saveBtnText") as HTMLSpanElement;
-const saveBtnLoading = document.getElementById("saveBtnLoading") as HTMLSpanElement;
+const saveBtnLoading = document.getElementById(
+  "saveBtnLoading",
+) as HTMLSpanElement;
 const testBtn = document.getElementById("testBtn") as HTMLButtonElement;
 const removeBtn = document.getElementById("removeBtn") as HTMLButtonElement;
-const statusMessage = document.getElementById("statusMessage") as HTMLDivElement;
-const apiKeyMissingBanner = document.getElementById("apiKeyMissingBanner") as HTMLDivElement;
-const dismissBannerBtn = document.getElementById("dismissBanner") as HTMLButtonElement;
-const providerInfoList = document.getElementById("providerInfoList") as HTMLUListElement;
+const statusMessage = document.getElementById(
+  "statusMessage",
+) as HTMLDivElement;
+const apiKeyMissingBanner = document.getElementById(
+  "apiKeyMissingBanner",
+) as HTMLDivElement;
+const dismissBannerBtn = document.getElementById(
+  "dismissBanner",
+) as HTMLButtonElement;
+const providerInfoList = document.getElementById(
+  "providerInfoList",
+) as HTMLUListElement;
 
 // State
 let isPasswordVisible = false;
@@ -78,7 +95,7 @@ async function updateProviderUI(provider: LLMProvider) {
     apiKeyLabel.textContent = `${providerMetadata.name} API Key`;
     apiKeyHelp.innerHTML = `${providerMetadata.helpText} - <a href="${providerMetadata.apiKeyUrl}" target="_blank">Get API key</a>`;
     apiKeyInput.placeholder = providerMetadata.placeholder;
-    
+
     // Update provider info
     providerInfoList.innerHTML = "";
     providerMetadata.info.forEach((item) => {
@@ -92,7 +109,8 @@ async function updateProviderUI(provider: LLMProvider) {
   const config = await ConfigManager.loadConfig();
   if (config.apiKey && config.provider === provider) {
     apiKeyInput.value = ConfigManager.redactApiKey(config.apiKey, provider);
-    apiKeyInput.placeholder = "API key is already saved (enter new key to replace)";
+    apiKeyInput.placeholder =
+      "API key is already saved (enter new key to replace)";
   } else {
     apiKeyInput.value = "";
   }
@@ -132,21 +150,31 @@ async function saveConfig() {
 
   try {
     // Save config and API key using ConfigManager
-    const apiKeyToSave = provider !== "none" && apiKey && !apiKey.includes("...****") ? apiKey : undefined;
-    const result = await ConfigManager.saveConfig(provider, model, apiKeyToSave);
-    
+    const apiKeyToSave =
+      provider !== "none" && apiKey && !apiKey.includes("...****")
+        ? apiKey
+        : undefined;
+    const result = await ConfigManager.saveConfig(
+      provider,
+      model,
+      apiKeyToSave,
+    );
+
     if (!result.success) {
       showStatus(result.error || "Failed to save configuration", "error");
       return;
     }
 
     showStatus("✅ Configuration saved successfully!", "success");
-    
+
     // Reload to show redacted key
     if (provider !== "none") {
       const savedConfig = await ConfigManager.loadConfig();
       if (savedConfig.apiKey) {
-        apiKeyInput.value = ConfigManager.redactApiKey(savedConfig.apiKey, provider);
+        apiKeyInput.value = ConfigManager.redactApiKey(
+          savedConfig.apiKey,
+          provider,
+        );
         apiKeyInput.type = "password";
         isPasswordVisible = false;
         toggleVisibilityBtn.textContent = "👁️";
@@ -156,7 +184,7 @@ async function saveConfig() {
     logger.error("Failed to save config:", error);
     showStatus(
       error instanceof Error ? error.message : "Failed to save configuration",
-      "error"
+      "error",
     );
   }
 }
@@ -167,7 +195,7 @@ async function saveConfig() {
  */
 async function validateApiKey(
   apiKey: string,
-  provider: LLMProvider
+  provider: LLMProvider,
 ): Promise<{ valid: boolean; error?: string }> {
   if (provider === "none") {
     return { valid: false, error: "No provider selected" };
@@ -218,8 +246,8 @@ async function navigateBackToChat() {
   try {
     // Try to find an existing tab with one of the supported platforms
     const tabs = await chrome.tabs.query({});
-    const platformTab = tabs.find((tab) =>
-      tab.url && platformUrls.some((url) => tab.url?.startsWith(url))
+    const platformTab = tabs.find(
+      (tab) => tab.url && platformUrls.some((url) => tab.url?.startsWith(url)),
     );
 
     if (platformTab && platformTab.id) {
@@ -292,7 +320,10 @@ async function init() {
     }
 
     // Validate format
-    const formatValidation = ConfigManager.validateApiKeyFormat(apiKey, provider);
+    const formatValidation = ConfigManager.validateApiKeyFormat(
+      apiKey,
+      provider,
+    );
     if (!formatValidation.valid) {
       showStatus(formatValidation.error || "Invalid API key format", "error");
       return;
@@ -319,7 +350,7 @@ async function init() {
     } catch (error) {
       showStatus(
         error instanceof Error ? error.message : "Failed to validate API key",
-        "error"
+        "error",
       );
     } finally {
       saveBtn.disabled = false;
@@ -348,14 +379,17 @@ async function init() {
     try {
       const validation = await validateApiKey(apiKey, provider);
       if (validation.valid) {
-        showStatus("✅ Connection test successful! API key is valid.", "success");
+        showStatus(
+          "✅ Connection test successful! API key is valid.",
+          "success",
+        );
       } else {
         showStatus(validation.error || "Connection test failed", "error");
       }
     } catch (error) {
       showStatus(
         error instanceof Error ? error.message : "Connection test failed",
-        "error"
+        "error",
       );
     } finally {
       testBtn.disabled = false;
@@ -374,7 +408,7 @@ async function init() {
     const providerMetadata = getProviderMetadata(provider);
     if (
       !confirm(
-        `Are you sure you want to remove your ${providerMetadata?.name || provider} API key? You'll need to enter it again to use AI features.`
+        `Are you sure you want to remove your ${providerMetadata?.name || provider} API key? You'll need to enter it again to use AI features.`,
       )
     ) {
       return;
@@ -398,7 +432,7 @@ async function init() {
     } catch (error) {
       showStatus(
         error instanceof Error ? error.message : "Failed to remove API key",
-        "error"
+        "error",
       );
     } finally {
       removeBtn.disabled = false;

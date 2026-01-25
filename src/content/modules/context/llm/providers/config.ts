@@ -1,6 +1,12 @@
 /**
  * Provider Configuration
  * Centralized configuration for all LLM providers
+ * 
+ * This configuration aligns with the Chrome extension manifest.json:
+ * - Platform domains (chatgpt.com, gemini.google.com, claude.ai, perplexity.ai) are in content_scripts matches
+ * - API endpoints (generativelanguage.googleapis.com, api.openai.com, api.anthropic.com) are in host_permissions
+ * 
+ * See manifest.json for the complete list of permissions and content script matches.
  */
 
 import type { LLMProvider } from "../LLMServiceFactory";

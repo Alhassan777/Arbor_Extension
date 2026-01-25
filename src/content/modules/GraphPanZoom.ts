@@ -2,7 +2,7 @@
  * GraphPanZoom - Handles panning and zooming for the graph canvas
  *
  * Features:
- * - Zoom with Space + scroll wheel
+ * - Zoom with mouse/touchpad scroll wheel (no modifier key needed)
  * - Pan with Space + drag
  * - Respects node dragging (doesn't interfere)
  */
@@ -129,15 +129,32 @@ export class GraphPanZoom {
   }
 
   /**
-   * Setup zoom functionality (Space + scroll wheel)
+   * Setup zoom functionality (mouse/touchpad scroll wheel)
    */
   private setupZoom() {
     if (!this.canvas || !this.content) return;
 
     this.wheelHandler = (e: WheelEvent) => {
-      // Only zoom when Space is held
-      if (!this.isSpacePressed) return;
+      const target = e.target as HTMLElement;
 
+      // Don't zoom if scrolling on interactive elements (let them handle their own scrolling)
+      const isOnInteractive =
+        target.closest(".graph-node") ||
+        target.closest(".connection-line") ||
+        target.closest(".connection-label") ||
+        target.closest(".connection-add-label");
+
+      // If Space is pressed, we're in pan mode, so don't zoom
+      if (this.isSpacePressed) {
+        return;
+      }
+
+      // If on interactive element, allow default scroll behavior
+      if (isOnInteractive) {
+        return;
+      }
+
+      // Otherwise, zoom with scroll wheel
       e.preventDefault();
       e.stopPropagation();
 

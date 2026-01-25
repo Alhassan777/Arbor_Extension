@@ -45,15 +45,16 @@ export class SidebarRenderer {
           <span>Arbor</span>
         </h2>
         <div class="arbor-header-actions">
-          <button id="open-settings-from-sidebar-btn" class="arbor-btn arbor-btn-ghost" title="Open Settings">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="margin-right: 4px;">
-              <path d="M8 10a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-              <path d="M13.5 8c0 .5-.1 1-.3 1.4l1.4 1.1c.2.2.3.5.2.7l-1.3 2.3c-.1.2-.4.3-.6.2l-1.7-.7c-.4.3-.9.5-1.4.6v1.4c0 .3-.2.5-.5.5H7.8c-.3 0-.5-.2-.5-.5v-1.4c-.5-.1-1-.3-1.4-.6l-1.7.7c-.2.1-.5 0-.6-.2L2.3 11.9c-.1-.2 0-.5.2-.7l1.4-1.1c-.2-.4-.3-.9-.3-1.4s.1-1 .3-1.4L2.5 6.3c-.2-.2-.3-.5-.2-.7l1.3-2.3c.1-.2.4-.3.6-.2l1.7.7c.4-.3.9-.5 1.4-.6V1.5c0-.3.2-.5.5-.5h2.4c.3 0 .5.2.5.5v1.4c.5.1 1 .3 1.4.6l1.7-.7c.2-.1.5 0 .6.2l1.3 2.3c.1.2 0 .5-.2.7l-1.4 1.1c.2.4.3.9.3 1.4z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <button id="open-settings-from-sidebar-btn" class="arbor-icon-btn" aria-label="Open Settings" title="Settings">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M9 11.25a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              <path d="M14.625 9c0 .563-.113 1.125-.338 1.575l1.575 1.238c.225.225.338.563.225.788l-1.462 2.587c-.113.225-.45.338-.675.225l-1.913-.788c-.45.338-1.012.563-1.575.675v1.575c0 .338-.225.563-.563.563H8.325c-.338 0-.563-.225-.563-.563V15.3c-.562-.113-1.125-.337-1.575-.675l-1.912.788c-.225.112-.563 0-.675-.225L2.138 12.6c-.113-.225 0-.563.225-.788l1.575-1.237c-.225-.45-.338-1.013-.338-1.575s.113-1.125.338-1.575L2.363 6.188c-.225-.225-.338-.563-.225-.788L3.6 2.813c.113-.225.45-.338.675-.225l1.913.788c.45-.338 1.012-.563 1.575-.675V1.125c0-.338.225-.563.562-.563h2.55c.338 0 .563.225.563.563v1.575c.562.112 1.125.337 1.575.675l1.912-.788c.225-.113.563 0 .675.225l1.463 2.587c.112.225 0 .563-.226.788l-1.575 1.237c.225.45.338 1.013.338 1.575z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Settings
           </button>
-          <button id="close-sidebar-btn" class="arbor-btn arbor-btn-ghost">
-            Close
+          <button id="close-sidebar-btn" class="arbor-icon-btn" aria-label="Close sidebar" title="Close">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M4.5 4.5l9 9M13.5 4.5l-9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
           </button>
         </div>
       </div>
