@@ -1,6 +1,7 @@
 const path = require('path');
 const CopyPlugin = require('copy-webpack-plugin');
 const webpack = require('webpack');
+const TerserPlugin = require('terser-webpack-plugin');
 
 module.exports = {
   entry: {
@@ -8,6 +9,7 @@ module.exports = {
     content: './src/content/content-production.ts',
     background: './src/background/background.ts',
     options: './src/options/options.ts',
+    'summarization.worker': './src/workers/summarization.worker.ts',
   },
   module: {
     rules: [
@@ -29,11 +31,30 @@ module.exports = {
     path: path.resolve(__dirname, 'dist'),
     clean: true,
     publicPath: '', // Required for content scripts - prevents automatic publicPath detection
+    globalObject: 'this', // Required for worker compatibility
   },
   optimization: {
     // Disable code splitting completely - content scripts can't load dynamic chunks
     splitChunks: false,
     runtimeChunk: false,
+    usedExports: true, // Enable tree-shaking
+    minimize: process.env.NODE_ENV === 'production',
+    minimizer: [
+      new TerserPlugin({
+        terserOptions: {
+          compress: {
+            drop_console: process.env.NODE_ENV === 'production',
+            drop_debugger: true,
+            pure_funcs: ['console.log', 'console.debug', 'console.info'],
+          },
+          mangle: true,
+          format: {
+            comments: false,
+          },
+        },
+        extractComments: false,
+      }),
+    ],
   },
   plugins: [
     new webpack.DefinePlugin({

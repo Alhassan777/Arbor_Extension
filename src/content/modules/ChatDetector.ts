@@ -1,66 +1,66 @@
-import { chatgptPlatform } from "../../platforms/chatgpt";
+import { PlatformFactory } from "../../platforms/factory";
+import { Platform } from "../../types";
 
 export interface AvailableChat {
   id: string;
   title: string;
   url: string;
-  platform: "chatgpt" | "gemini" | "perplexity";
+  platform: "chatgpt" | "gemini" | "claude" | "perplexity";
 }
 
 export class ChatDetector {
-  private platform: "chatgpt" | "gemini" | "perplexity";
+  private platform: "chatgpt" | "gemini" | "claude" | "perplexity";
+  private platformAdapter: Platform | null;
 
-  constructor(platform: "chatgpt" | "gemini" | "perplexity") {
+  constructor(platform: "chatgpt" | "gemini" | "claude" | "perplexity") {
     this.platform = platform;
+    this.platformAdapter = PlatformFactory.getPlatformByName(platform);
   }
 
   async scanAvailableChats(): Promise<AvailableChat[]> {
     try {
-      // Currently only ChatGPT is implemented
-      if (this.platform === "chatgpt") {
-        const chats = chatgptPlatform.getAllChatsFromSidebar();
-        return chats.map(
-          (chat: { id: string; title: string; url: string }) => ({
-            ...chat,
-            platform: this.platform as "chatgpt",
-          })
+      console.log(
+        `🌳 Arbor [ChatDetector]: Scanning for ${this.platform} chats...`,
+      );
+
+      if (!this.platformAdapter) {
+        console.warn(
+          `🌳 Arbor [ChatDetector]: No platform adapter found for ${this.platform}`,
         );
+        return [];
       }
 
-      return [];
+      const chats = this.platformAdapter.getAllChatsFromSidebar();
+      console.log(
+        `🌳 Arbor [ChatDetector]: Found ${chats.length} chats for ${this.platform}`,
+      );
+
+      return chats.map((chat: { id: string; title: string; url: string }) => ({
+        ...chat,
+        platform: this.platform,
+      }));
     } catch (error) {
-      console.error("Error scanning chats:", error);
+      console.error(
+        `🌳 Arbor [ChatDetector]: Error scanning ${this.platform} chats:`,
+        error,
+      );
       return [];
     }
   }
 
   detectCurrentChat(): { url: string; title: string } | null {
-    const url = window.location.href;
+    if (!this.platformAdapter) return null;
 
-    if (this.platform === "chatgpt") {
-      // Check if we're on a chat page
-      const chatIdMatch = url.match(/\/c\/([a-zA-Z0-9-]+)/);
-      if (!chatIdMatch) return null;
+    const url = this.platformAdapter.detectCurrentChatUrl();
+    const title = this.platformAdapter.detectChatTitle();
 
-      // Try to get title from page
-      const titleEl =
-        document.querySelector("h1") ||
-        document.querySelector('[class*="title"]');
-      const title = titleEl?.textContent?.trim() || "Untitled Chat";
+    if (!url || !title) return null;
 
-      return { url, title };
-    }
-
-    return null;
+    return { url, title };
   }
 
   isOnChatPage(): boolean {
-    const url = window.location.href;
-
-    if (this.platform === "chatgpt") {
-      return /\/c\/[a-zA-Z0-9-]+/.test(url);
-    }
-
-    return false;
+    if (!this.platformAdapter) return false;
+    return this.platformAdapter.isInConversation();
   }
 }

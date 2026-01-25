@@ -4,7 +4,7 @@ import type { ChatTree, ChatNode } from "../../types";
 export class TreeManager {
   async createTree(
     name: string,
-    platform: "chatgpt" | "gemini" | "perplexity"
+    platform: "chatgpt" | "gemini" | "claude" | "perplexity"
   ): Promise<ChatTree> {
     const treeId = `tree-${Date.now()}-${Math.random()
       .toString(36)

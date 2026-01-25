@@ -1,0 +1,100 @@
+---
+description: "Modern UI design patterns and component guidelines"
+globs: ["src/components/**", "**/*.tsx"]
+---
+
+# UI Design Standards
+
+## Design Principles
+
+1. **Mobile-First**: Design for mobile, enhance for desktop
+2. **Accessibility-First**: WCAG 2.1 AA minimum (color contrast, keyboard nav, semantics)
+3. **Performance**: Image optimization, lazy loading, code splitting
+4. **Modern Aesthetics**: Clean, minimal, with purposeful micro-interactions
+
+## Color System
+
+- Use shadcn/ui color palette or extend with design tokens
+- Primary: For CTAs and primary actions
+- Secondary: For supporting actions
+- Destructive: For deletion, cancellation (red tones)
+- Success: For positive states (green tones)
+- Warning: For caution states (amber tones)
+- Muted: For disabled, placeholder states
+- Ensure 4.5:1 contrast ratio for normal text, 3:1 for large text
+
+## Typography
+
+- **Headings**:
+  - h1: 32px (2xl), weight 600, tight line-height (1.2)
+  - h2: 28px (xl), weight 600
+  - h3: 20px (lg), weight 600
+  - h4+: 16px (base), weight 600
+- **Body**: 14-16px, weight 400, line-height 1.5
+- **Small/Caption**: 12px, weight 400
+
+## Spacing Grid
+
+- Use 4px increments
+- Padding: 16px (standard), 24px (generous), 8px (tight)
+- Gaps between components: 8px, 12px, 16px, 24px
+- Margin between sections: 24px, 32px, 48px
+
+## Interactive Elements
+
+- Buttons: 40px min height (touch target)
+- Inputs: 40px height, 12px padding
+- Icons: 20px (default), 24px (large), 16px (small)
+- Hover states: Subtle background or opacity change
+- Focus states: 2px ring with 2px offset (visible)
+- Active states: Deeper color or shadow shift
+
+## Animation & Transitions
+
+- Micro-interactions: 150-200ms duration
+- Page transitions: 250-300ms duration
+- Easing: Use `cubic-bezier(0.4, 0, 0.2, 1)` for standard motion
+- Animation library: Framer Motion with presets
+- Avoid: Auto-playing animations > 5 seconds, unnecessary parallax
+
+## Components to Build First
+
+1. **Button** (Primary, Secondary, Outline, Ghost variants)
+2. **Input** (Text, Email, Password with validation states)
+3. **Card** (With shadow, border options)
+4. **Badge** (For tags, statuses)
+5. **Modal/Dialog** (Accessible with focus management)
+6. **Loading States** (Spinners, skeletons, progress bars)
+7. **Toast Notifications** (Success, error, warning, info)
+8. **Navigation** (Sidebar, breadcrumbs, tabs)
+
+## Dark Mode Support
+
+- Use CSS variables with `prefers-color-scheme` media query
+- Provide toggle if needed
+- Test contrast ratios in both modes
+- Use semantic variable names: `--color-text-primary`, `--color-bg-primary`
+
+## Form Best Practices
+
+- **Validation**: Real-time feedback (Zod + React Hook Form)
+- **Labels**: Always visible, semantic `<label>` elements
+- **Error States**: Clear error messages below input
+- **Loading States**: Disabled button with spinner during submission
+- **Success States**: Confirmation message or redirect
+- **Placeholder Text**: Should NOT replace labels
+
+## Responsive Design Breakpoints
+
+- Mobile: 320px-640px (sm: 640px)
+- Tablet: 641px-1024px (md: 768px, lg: 1024px)
+- Desktop: 1025px+ (xl: 1280px, 2xl: 1536px)
+- Use Tailwind's responsive prefixes: `sm:`, `md:`, `lg:`
+
+## Performance Metrics
+
+- LCP (Largest Contentful Paint): < 2.5s
+- FID (First Input Delay): < 100ms
+- CLS (Cumulative Layout Shift): < 0.1
+- Optimize images: WebP format, proper sizing
+- Lazy load below-the-fold content

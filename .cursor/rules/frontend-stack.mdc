@@ -1,0 +1,119 @@
+---
+description: "Frontend technology stack and best practices"
+globs: ["src/**/*.tsx", "src/**/*.ts", "components/**"]
+---
+
+# Frontend Stack Configuration
+
+## Core Technologies
+
+- **Framework**: React 18+ with TypeScript
+- **Styling**: Tailwind CSS (utility-first)
+- **Components**: shadcn/ui (copy-paste ownership model)
+- **Icons**: Heroicons (official Tailwind icons)
+- **Animations**: Framer Motion for interactive animations
+- **Form Handling**: React Hook Form + Zod (type-safe validation)
+- **State Management**: TanStack Query (server state) + Zustand (client state)
+- **Package Manager**: pnpm
+
+## Component Structure (Canonical Example)
+
+Use this pattern for all new components:
+
+````typescript
+'use client';
+
+import { ComponentProps, ReactNode } from 'react';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from '@/lib/utils';
+
+const buttonVariants = cva(
+  'inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed',
+  {
+    variants: {
+      variant: {
+        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        outline: 'border border-input hover:bg-accent',
+        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+        ghost: 'hover:bg-accent',
+      },
+      size: {
+        default: 'h-10 px-4 py-2',
+        sm: 'h-8 px-3 text-sm',
+        lg: 'h-12 px-8',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  }
+);
+
+interface ButtonProps
+  extends ComponentProps<'button'>,
+    VariantProps<typeof buttonVariants> {}
+
+const Button = ({ className, variant, size, ...props }: ButtonProps) => (
+  <button
+    className={cn(buttonVariants({ variant, size }), className)}
+    {...props}
+  />
+);
+
+export { Button, buttonVariants };
+
+## Design System Integration
+
+- Use CSS variables from design system (colors, spacing, typography)
+
+- All colors from @/styles/variables.css
+
+- Spacing: 4px grid (4, 8, 12, 16, 20, 24, 32, 40, 48)
+
+- Typography: System fonts + custom fonts only if performance-tested
+
+## Naming Conventions
+- Components: PascalCase (UserCard.tsx, JobListings.tsx)
+
+- Utilities: camelCase (cn.ts, formatDate.ts)
+
+- Constants: SCREAMING_SNAKE_CASE
+
+- Hooks: Prefix with use (useJobApplication, useAuthContext)
+
+## Code Quality
+- Always use TypeScript strict mode
+
+- Export components as named exports
+
+- Use 'use client' directive for client components in App Router
+
+- Prop drilling: Max 2 levels, then use Context API or TanStack Query
+
+- Avoid inline styles; use Tailwind classes
+
+## File Organization
+
+```text
+src/
+├── components/
+│   ├── ui/              # shadcn/ui components (copy-paste)
+│   ├── features/        # Feature-specific components
+│   └── layouts/         # Page layouts
+├── hooks/               # Custom React hooks
+├── lib/                 # Utilities (cn.ts, api.ts, etc.)
+├── styles/              # CSS files + design tokens
+├── types/               # TypeScript types
+└── app/                 # Next.js App Router
+````
+
+## Commands
+
+- npm run dev: Start dev server
+
+- npm run build: Production build
+
+- npm run type-check: Run TypeScript check
+
+- npm run lint: ESLint validation

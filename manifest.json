@@ -14,7 +14,9 @@
     "https://chatgpt.com/*",
     "https://chat.openai.com/*",
     "https://gemini.google.com/*",
+    "https://claude.ai/*",
     "https://perplexity.ai/*",
+    "https://www.perplexity.ai/*",
     "https://generativelanguage.googleapis.com/*"
   ],
   "content_scripts": [
@@ -23,7 +25,9 @@
         "https://chatgpt.com/*",
         "https://chat.openai.com/*",
         "https://gemini.google.com/*",
-        "https://perplexity.ai/*"
+        "https://claude.ai/*",
+        "https://perplexity.ai/*",
+        "https://www.perplexity.ai/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"
@@ -52,12 +56,14 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["icons/logo.webp"],
+      "resources": ["icons/logo.webp", "summarization.worker.js"],
       "matches": [
         "https://chatgpt.com/*",
         "https://chat.openai.com/*",
         "https://gemini.google.com/*",
-        "https://perplexity.ai/*"
+        "https://claude.ai/*",
+        "https://perplexity.ai/*",
+        "https://www.perplexity.ai/*"
       ]
     }
   ]

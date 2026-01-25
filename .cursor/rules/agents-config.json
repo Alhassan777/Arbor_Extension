@@ -1,0 +1,365 @@
+
+{
+  "agents": {
+    "main": {
+      "name": "Main Product Builder",
+      "description": "Orchestrates UI feature development, coordinates subagents, integrates components",
+      "context": [
+        "@frontend-stack.mdc",
+        "@ui-design.mdc",
+        "@accessibility.mdc",
+        "instructions.md"
+      ],
+      "features": {
+        "plan_mode": true,
+        "browser_aware": true,
+        "visual_editor": true,
+        "agent_mode": true,
+        "browser_control": true,
+        "mcp_servers": ["figma", "git", "cursor-ide-browser", "cursor-browser-extension"]
+      }
+    },
+    "ui_builder": {
+      "name": "UI Component Builder",
+      "description": "Creates visually stunning, responsive React components",
+      "role": "Specializes in shadcn/ui components, Tailwind CSS, component structure",
+      "scope": {
+        "write": ["src/components/**/*.tsx"],
+        "read": ["@frontend-stack.mdc", "@ui-design.mdc"]
+      },
+      "constraints": [
+        "No API calls or backend logic",
+        "Focus on visual rendering and component APIs",
+        "Use canonical component structure",
+        "Always include TypeScript types",
+        "Implement all component variants and states"
+      ],
+      "success_criteria": [
+        "Component works in isolation",
+        "Responsive across breakpoints",
+        "Tailwind classes optimized",
+        "TypeScript strict mode passes"
+      ]
+    },
+    "integration_expert": {
+      "name": "Integration & Data Layer",
+      "description": "Builds API integrations, hooks, and state management",
+      "role": "Handles fetch logic, TanStack Query, custom hooks, error handling",
+      "scope": {
+        "write": ["src/hooks/**/*.ts", "src/lib/api/**/*.ts", "src/services/**/*.ts"],
+        "read": ["@frontend-stack.mdc"]
+      },
+      "constraints": [
+        "No UI rendering code",
+        "Provide TypeScript types for all API responses",
+        "Implement error boundaries and fallbacks",
+        "Use TanStack Query for server state",
+        "Handle loading, error, success states"
+      ],
+      "success_criteria": [
+        "Hook exports correct types",
+        "Error handling comprehensive",
+        "Data caching works correctly",
+        "API calls are efficient (no over-fetching)"
+      ]
+    },
+    "form_specialist": {
+      "name": "Form & Validation Expert",
+      "description": "Builds complex forms with validation and submission logic",
+      "role": "React Hook Form, Zod schemas, form interactions, user feedback",
+      "scope": {
+        "write": ["src/components/forms/**/*.tsx", "src/schemas/**/*.ts"],
+        "read": ["@frontend-stack.mdc", "@ui-design.mdc"]
+      },
+      "constraints": [
+        "All forms must have Zod validation schemas",
+        "Real-time validation feedback",
+        "Loading states during submission",
+        "Clear error messages",
+        "Success/error toast notifications"
+      ],
+      "success_criteria": [
+        "Form submits correctly",
+        "All fields validate as expected",
+        "Error messages are helpful",
+        "Loading state prevents double-submission",
+        "Keyboard navigation works (Tab, Enter)"
+      ]
+    },
+    "animation_specialist": {
+      "name": "Motion & Animation Expert",
+      "description": "Creates smooth, performant animations and transitions",
+      "role": "Framer Motion, micro-interactions, motion design, accessibility",
+      "scope": {
+        "write": ["src/components/**/*.tsx (animation sections)"],
+        "read": ["@ui-design.mdc"]
+      },
+      "constraints": [
+        "Keep animations < 300ms for UX feedback",
+        "Respect prefers-reduced-motion setting",
+        "Use smooth easing functions",
+        "Test performance impact",
+        "Entrance/exit animations for list items"
+      ],
+      "success_criteria": [
+        "Animations feel natural and snappy",
+        "No jank or performance degradation",
+        "Accessible (respects motion preferences)",
+        "Code uses Framer Motion best practices",
+        "Works on mobile devices"
+      ]
+    },
+    "a11y_auditor": {
+      "name": "Accessibility Auditor",
+      "description": "Reviews components for WCAG 2.1 AA compliance",
+      "role": "ARIA attributes, semantic HTML, keyboard nav, contrast ratios, focus management",
+      "scope": {
+        "read": ["src/components/**/*.tsx", "@accessibility.mdc"],
+        "report_to": ["main", "ui_builder"]
+      },
+      "constraints": [
+        "WCAG 2.1 Level AA minimum",
+        "4.5:1 color contrast for text",
+        "Keyboard navigation complete",
+        "Focus indicators visible",
+        "Screen reader friendly"
+      ],
+      "success_criteria": [
+        "axe DevTools audit passes",
+        "Keyboard-only navigation works",
+        "Focus order is logical",
+        "ARIA labels are accurate",
+        "Color contrast sufficient"
+      ]
+    },
+    "performance_optimizer": {
+      "name": "Performance Optimizer",
+      "description": "Ensures fast page loads and smooth interactions",
+      "role": "Code splitting, image optimization, lazy loading, bundle analysis",
+      "scope": {
+        "analyze": ["src/**/*.tsx", "public/**"],
+        "report_to": ["main"]
+      },
+      "metrics": {
+        "lcp_target": "< 2.5s",
+        "fid_target": "< 100ms",
+        "cls_target": "< 0.1"
+      },
+      "success_criteria": [
+        "LCP optimized",
+        "No cumulative layout shift",
+        "Images properly sized and formatted",
+        "Code splitting implemented",
+        "Bundle size tracked"
+      ]
+    }
+  },
+  "workflows": {
+    "new_feature": {
+      "name": "New Feature Development",
+      "steps": [
+        {
+          "step": 1,
+          "agent": "main",
+          "action": "Create feature plan",
+          "prompt": "Use Plan Mode to break down requirements into component, hook, and form tasks"
+        },
+        {
+          "step": 2,
+          "agent": "ui_builder",
+          "action": "Build UI components in parallel",
+          "prompt": "@ui_builder: Create components based on plan. Use shadcn/ui, responsive design, all states."
+        },
+        {
+          "step": 3,
+          "agent": "integration_expert",
+          "action": "Build API hooks in parallel",
+          "prompt": "@integration-expert: Create hooks for data fetching, caching, error handling."
+        },
+        {
+          "step": 4,
+          "agent": "form_specialist",
+          "action": "Build forms if needed",
+          "prompt": "@form-specialist: Create forms with React Hook Form, Zod validation, user feedback."
+        },
+        {
+          "step": 5,
+          "agent": "animation_specialist",
+          "action": "Add animations",
+          "prompt": "@animation-specialist: Add entrance, hover, and exit animations. Test performance."
+        },
+        {
+          "step": 6,
+          "agent": "a11y_auditor",
+          "action": "Accessibility audit",
+          "prompt": "@a11y-auditor: Review all components. Check WCAG 2.1 AA compliance. Report issues."
+        },
+        {
+          "step": 7,
+          "agent": "main",
+          "action": "Integrate and test",
+          "prompt": "Integrate all components, test in browser, verify responsive design, commit."
+        }
+      ]
+    },
+    "design_to_code": {
+      "name": "Design Mockup to Interactive Code",
+      "steps": [
+        {
+          "step": 1,
+          "agent": "main",
+          "action": "Analyze design",
+          "prompt": "I'm pasting a design mockup. Analyze the layout, components, colors, typography. Suggest React component structure."
+        },
+        {
+          "step": 2,
+          "agent": "ui_builder",
+          "action": "Generate component code",
+          "prompt": "@ui_builder: Convert the design into React components using shadcn/ui and Tailwind CSS. Match colors, spacing, typography exactly."
+        },
+        {
+          "step": 3,
+          "agent": "main",
+          "action": "Verify in visual editor",
+          "prompt": "Use the visual editor to compare generated code with design mockup. Adjust spacing, colors as needed."
+        },
+        {
+          "step": 4,
+          "agent": "integration_expert",
+          "action": "Wire up interactivity",
+          "prompt": "@integration-expert: Add data fetching hooks. Connect component props to API data."
+        },
+        {
+          "step": 5,
+          "agent": "a11y_auditor",
+          "action": "Accessibility review",
+          "prompt": "@a11y-auditor: Final accessibility audit before shipping."
+        }
+      ]
+    },
+    "component_refinement": {
+      "name": "Component Refinement Cycle",
+      "steps": [
+        {
+          "step": 1,
+          "agent": "main",
+          "action": "Identify issues",
+          "prompt": "Screenshot the component or describe issues. Ask for specific fixes."
+        },
+        {
+          "step": 2,
+          "agent": "ui_builder",
+          "action": "Fix styling/layout",
+          "prompt": "@ui_builder: Fix the specific styling/layout issue mentioned. Test responsive design."
+        },
+        {
+          "step": 3,
+          "agent": "a11y_auditor",
+          "action": "Verify a11y still passes",
+          "prompt": "@a11y-auditor: Re-audit after changes. Ensure no regressions."
+        },
+        {
+          "step": 4,
+          "agent": "main",
+          "action": "Final visual check",
+          "prompt": "Screenshot and compare. If good, commit. If not, iterate."
+        }
+      ]
+    }
+  },
+  "commands": {
+    "new_component": {
+      "shortcut": "/component",
+      "prompt": "Create a new shadcn/ui-based component called {name} that {description}. Use the canonical structure from @frontend-stack.mdc. Include all props, TypeScript types, responsive variants, and dark mode support. Make sure Tailwind classes are optimized."
+    },
+    "new_hook": {
+      "shortcut": "/hook",
+      "prompt": "@integration-expert: Create a custom React hook called use{Name} that {description}. Use TanStack Query for data fetching if applicable. Handle loading, error, and success states. Return properly typed data."
+    },
+    "new_form": {
+      "shortcut": "/form",
+      "prompt": "@form-specialist: Build a form component called {name} that {description}. Include React Hook Form, Zod validation schema, error messages, loading state, and success/error toast notifications."
+    },
+    "audit_a11y": {
+      "shortcut": "/audit-a11y",
+      "prompt": "@a11y-auditor: Review {component_path} for WCAG 2.1 AA compliance. Check ARIA labels, keyboard navigation, color contrast (4.5:1), focus management, and semantic HTML. Provide a report with specific fixes needed."
+    },
+    "animate_component": {
+      "shortcut": "/animate",
+      "prompt": "@animation-specialist: Add smooth animations to {component_path}. Include entrance (fade in + slide), hover effects, and exit animations. Keep animations < 300ms. Respect prefers-reduced-motion. Use Framer Motion."
+    },
+    "design_to_code": {
+      "shortcut": "/design-to-code",
+      "prompt": "I'm pasting a design mockup below. Analyze it and suggest React component structure, Tailwind layout, shadcn/ui components, colors, and spacing. Then generate production-ready code using @ui_builder."
+    },
+    "optimize_responsive": {
+      "shortcut": "/responsive",
+      "prompt": "Test {component_path} on mobile, tablet, and desktop. Use Cursor's visual editor with responsive mode. Fix any layout issues. Verify Tailwind breakpoints (sm, md, lg, xl) work correctly."
+    }
+  },
+  "settings": {
+    "context_window_management": {
+      "max_context_per_chat": 30000,
+      "strategy": "Start new chats for complex features, keep related tasks in same chat",
+      "context_summarization": true
+    },
+    "rules_application": {
+      "auto_apply_rules": true,
+      "glob_patterns": {
+        "frontend_stack": ["src/**/*.tsx", "src/**/*.ts", "components/**"],
+        "ui_design": ["src/components/**", "**/*.tsx"],
+        "accessibility": ["src/**/*.tsx"],
+        "chrome_extensions": ["extension/**", "*.manifest.json"]
+      }
+    },
+    "code_generation": {
+      "typescript_strict_mode": true,
+      "prefer_named_exports": true,
+      "component_structure": "Use canonical pattern from @frontend-stack.mdc",
+      "naming_convention": {
+        "components": "PascalCase",
+        "hooks": "camelCase with 'use' prefix",
+        "utilities": "camelCase",
+        "constants": "SCREAMING_SNAKE_CASE"
+      }
+    },
+    "testing": {
+      "framework": "Vitest + React Testing Library",
+      "coverage_minimum": 80,
+      "test_file_location": "*.test.ts(x)"
+    },
+    "performance_targets": {
+      "lcp": "< 2.5s",
+      "fid": "< 100ms",
+      "cls": "< 0.1",
+      "bundle_size_warn": "500kb"
+    }
+  },
+  "mcp_servers": {
+    "figma": {
+      "enabled": true,
+      "purpose": "Direct Figma design-to-code integration",
+      "commands": ["get-files", "get-components", "export-design"]
+    },
+    "git": {
+      "enabled": true,
+      "purpose": "Version control awareness, diff review",
+      "commands": ["show-changes", "suggest-commit-message", "list-recent-commits"]
+    },
+    "web": {
+      "enabled": true,
+      "purpose": "Research current best practices, library documentation",
+      "commands": ["search", "fetch-docs"]
+    },
+    "cursor-ide-browser": {
+      "enabled": true,
+      "purpose": "Browser automation and testing for frontend/webapp development",
+      "commands": ["browser_navigate", "browser_snapshot", "browser_click", "browser_type", "browser_fill", "browser_scroll", "browser_lock", "browser_unlock", "browser_tabs"]
+    },
+    "cursor-browser-extension": {
+      "enabled": true,
+      "purpose": "Browser navigation and interaction for frontend/webapp development and testing",
+      "commands": ["browser_navigate", "browser_snapshot", "browser_click", "browser_type", "browser_fill"]
+    }
+  }
+}

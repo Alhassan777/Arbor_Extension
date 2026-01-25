@@ -3,8 +3,17 @@
 import { logger } from "../utils/logger";
 import { retryWithBackoff } from "../utils/retry";
 import { getApiKey } from "../storage/apiKeyStorage";
+import { RateLimiter } from "../utils/rateLimiter";
 
 logger.debug("Background script loaded");
+
+// SECURITY: Rate limiter to prevent API quota exhaustion and abuse
+// Allows 20 calls per minute (generous for normal usage, prevents abuse)
+const apiRateLimiter = new RateLimiter({
+  maxCalls: 20,
+  windowMs: 60000, // 1 minute
+  identifier: 'Gemini API'
+});
 
 // Listen for extension installation
 chrome.runtime.onInstalled.addListener((details) => {
@@ -158,6 +167,16 @@ async function handleGeminiAPICall(payload: {
   // Validate API key format
   if (!apiKey.startsWith("AIza") || apiKey.length < 30) {
     throw new Error("Invalid Gemini API key format");
+  }
+
+  // SECURITY: Check rate limit before making API call
+  if (!apiRateLimiter.attemptCall()) {
+    const resetTimeSeconds = Math.ceil(apiRateLimiter.getTimeUntilReset() / 1000);
+    const remainingCalls = apiRateLimiter.getRemainingCalls();
+    throw new Error(
+      `Rate limit exceeded. Please wait ${resetTimeSeconds} seconds before trying again. ` +
+      `(${remainingCalls} calls remaining)`
+    );
   }
 
   // Use retry logic for API call

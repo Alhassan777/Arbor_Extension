@@ -3,7 +3,7 @@ export interface ChatNode {
   id: string;
   title: string;
   url: string;
-  platform: 'chatgpt' | 'gemini' | 'perplexity';
+  platform: 'chatgpt' | 'gemini' | 'claude' | 'perplexity';
   parentId: string | null;
   children: string[]; // array of child IDs
   createdAt: string;
@@ -75,8 +75,11 @@ export interface Platform {
     connectionType?: string;
   }): string;
   copyToClipboard(text: string): Promise<boolean>;
-  onNavigationChange(callback: (chatId: string | null) => void): void;
+  onNavigationChange(callback: (chatId: string | null) => void): (() => void);
   extractMessages(): Array<{ role: 'user' | 'assistant'; content: string }>;
   getRecentMessages(count?: number): Array<{ role: 'user' | 'assistant'; content: string }>;
   renameChat(chatUrl: string, newTitle: string): Promise<boolean>;
+  getAllChatsFromSidebar(): Array<{ id: string; title: string; url: string }>;
+  pasteIntoInput(text: string): Promise<boolean>;
+  cleanup(): void;
 }

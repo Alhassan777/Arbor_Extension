@@ -8,6 +8,7 @@
 import { db } from "./db";
 import { detectPlatform } from "./platformDetector";
 import { chatgptPlatform } from "../platforms/chatgpt";
+import { PlatformFactory } from "../platforms/factory";
 import { GraphRenderer } from "./modules/GraphRenderer";
 import { ConnectionLabelsManager } from "./modules/ConnectionLabels";
 import { SidebarObserver } from "./modules/SidebarObserver";
@@ -18,7 +19,6 @@ import { NodeInteractions } from "./modules/NodeInteractions";
 import { ChatDetector } from "./modules/ChatDetector";
 import { UIInjector } from "./modules/UIInjector";
 import { GraphPanZoom } from "./modules/GraphPanZoom";
-import { BranchContextManager } from "./modules/BranchContextManager";
 import {
   BranchConnectionTypeDialog,
   type BranchDialogResult,
@@ -38,7 +38,13 @@ class ArborExtension {
 
   private availableChats: AvailableChat[] = [];
   private sidebarInjected = false;
-  private platform: "chatgpt" | "gemini" | "perplexity";
+  private platform: "chatgpt" | "gemini" | "claude" | "perplexity";
+  private cleanupFunctions: Array<() => void> = [];
+
+  // Render throttling
+  private renderDebounceTimer: number | null = null;
+  private isDirty = false;
+  private lastRenderedTreeId: string | null = null;
 
   // Modules
   private graphRenderer: GraphRenderer;
@@ -51,15 +57,15 @@ class ArborExtension {
   private chatDetector: ChatDetector;
   private uiInjector: UIInjector;
   private graphPanZoom: GraphPanZoom;
-  private branchContextManager: BranchContextManager;
+  private branchContextManager: any = null; // Lazy loaded
 
-  constructor(platform: "chatgpt" | "gemini" | "perplexity") {
+  constructor(platform: "chatgpt" | "gemini" | "claude" | "perplexity") {
     this.platform = platform;
 
     // Initialize modules with proper callbacks
     this.graphRenderer = new GraphRenderer(
       (nodeId) => this.handleNodeClick(nodeId),
-      (childId, parentId) => this.handleConnectionLabelClick(childId, parentId)
+      (childId, parentId) => this.handleConnectionLabelClick(childId, parentId),
     );
     this.connectionLabels = new ConnectionLabelsManager();
     this.sidebarObserver = new SidebarObserver();
@@ -69,10 +75,10 @@ class ArborExtension {
     this.nodeInteractions = new NodeInteractions();
     this.chatDetector = new ChatDetector(platform);
     this.uiInjector = new UIInjector((action, data) =>
-      this.handleSidebarAction(action, data)
+      this.handleSidebarAction(action, data),
     );
     this.graphPanZoom = new GraphPanZoom();
-    this.branchContextManager = new BranchContextManager(platform);
+    // BranchContextManager is lazy loaded on demand
 
     this.init();
   }
@@ -84,11 +90,11 @@ class ArborExtension {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.action === "model-download-complete") {
         console.log(
-          `🌳 Arbor: ✅ Model downloaded successfully in ${message.loadTime}s`
+          `🌳 Arbor: ✅ Model downloaded successfully in ${message.loadTime}s`,
         );
         this.showNotification(
           `Model ready! Downloaded in ${message.loadTime}s`,
-          "success"
+          "success",
         );
       }
       return false;
@@ -122,6 +128,15 @@ class ArborExtension {
     });
   }
 
+  private async getBranchContextManager(): Promise<any> {
+    if (!this.branchContextManager) {
+      const { BranchContextManager } =
+        await import("./modules/BranchContextManager");
+      this.branchContextManager = new BranchContextManager(this.platform);
+    }
+    return this.branchContextManager;
+  }
+
   private onPageReady() {
     console.log("📄 Page ready");
 
@@ -132,31 +147,122 @@ class ArborExtension {
     this.handleAutoPasteAndTreeAddition();
     this.setupNavigationListener();
 
-    // Periodic updates
-    setInterval(() => this.scanAvailableChats(), 10000);
-    setInterval(() => this.detectAndTrackCurrentChat(), 5000);
+    // Visibility-aware periodic updates
+    this.setupVisibilityAwareScanning();
+  }
+
+  private setupVisibilityAwareScanning() {
+    let chatScanInterval: number | null = null;
+    let trackingInterval: number | null = null;
+    let isVisible = !document.hidden;
+    let consecutiveNoChanges = 0;
+
+    const startScanning = () => {
+      if (chatScanInterval !== null || trackingInterval !== null) return;
+
+      // Adaptive intervals: start with shorter intervals, increase if no changes
+      const getChatScanInterval = () => {
+        // Start at 8s, increase to 20s max (reduced from 10s/30s)
+        return consecutiveNoChanges > 5 ? 20000 : 8000;
+      };
+      const getTrackingInterval = () => {
+        // Start at 4s, increase to 10s max (reduced from 5s/15s)
+        return consecutiveNoChanges > 5 ? 10000 : 4000;
+      };
+
+      // Chat scanning with exponential backoff
+      const scanChats = async () => {
+        const beforeCount = this.availableChats.length;
+        await this.scanAvailableChats();
+        const afterCount = this.availableChats.length;
+
+        if (beforeCount === afterCount) {
+          consecutiveNoChanges++;
+        } else {
+          consecutiveNoChanges = 0;
+        }
+      };
+
+      chatScanInterval = window.setInterval(() => {
+        if (isVisible) scanChats();
+      }, getChatScanInterval());
+
+      trackingInterval = window.setInterval(() => {
+        if (isVisible) this.detectAndTrackCurrentChat();
+      }, getTrackingInterval());
+    };
+
+    const stopScanning = () => {
+      if (chatScanInterval !== null) {
+        clearInterval(chatScanInterval);
+        chatScanInterval = null;
+      }
+      if (trackingInterval !== null) {
+        clearInterval(trackingInterval);
+        trackingInterval = null;
+      }
+    };
+
+    // Handle visibility changes
+    const handleVisibilityChange = () => {
+      const wasVisible = isVisible;
+      isVisible = !document.hidden;
+
+      if (isVisible && !wasVisible) {
+        // Tab became visible - scan immediately and restart intervals
+        console.log("🌳 Arbor: Tab visible, resuming scans");
+        consecutiveNoChanges = 0; // Reset backoff
+        stopScanning();
+        this.scanAvailableChats();
+        this.detectAndTrackCurrentChat();
+        startScanning();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Store cleanup function
+    this.cleanupFunctions.push(() => {
+      stopScanning();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    });
+
+    // Start scanning
+    startScanning();
   }
 
   /**
    * Set up navigation listener to detect when new chats are created
    */
   private setupNavigationListener() {
-    if (this.platform === "chatgpt") {
-      let lastChatId: string | null = chatgptPlatform.getChatId();
+    // Get the active platform adapter using the factory
+    const platformAdapter = PlatformFactory.getActivePlatform();
 
-      chatgptPlatform.onNavigationChange((chatId) => {
-        // Chat ID changed - might be a new chat from branch creation
-        if (chatId !== lastChatId) {
-          lastChatId = chatId;
+    if (!platformAdapter) {
+      console.warn(
+        "🌳 Arbor: No active platform found for navigation listener",
+      );
+      return;
+    }
 
-          // Check if we have branch context to handle
-          const parentNodeId = sessionStorage.getItem(
-            "arbor_branch_parent_node_id"
-          );
-          const parentTreeId = sessionStorage.getItem(
-            "arbor_branch_parent_tree_id"
-          );
-          const timestamp = sessionStorage.getItem("arbor_branch_timestamp");
+    let lastChatId: string | null = platformAdapter.getChatId();
+
+    const cleanup = platformAdapter.onNavigationChange(async (chatId) => {
+      // Chat ID changed - might be a new chat from branch creation
+      if (chatId !== lastChatId) {
+        lastChatId = chatId;
+
+        // Check if we have branch context to handle (using secure chrome.storage.session)
+        try {
+          const data = await chrome.storage.session.get([
+            "arbor_branch_parent_node_id",
+            "arbor_branch_parent_tree_id",
+            "arbor_branch_timestamp",
+          ]);
+
+          const parentNodeId = data.arbor_branch_parent_node_id;
+          const parentTreeId = data.arbor_branch_parent_tree_id;
+          const timestamp = data.arbor_branch_timestamp;
 
           // Only process if we have the required info and it's recent (within 5 minutes)
           if (parentNodeId && parentTreeId && chatId && timestamp) {
@@ -172,9 +278,14 @@ class ArborExtension {
               this.clearBranchContext();
             }
           }
+        } catch (error) {
+          console.error("Failed to retrieve branch context:", error);
         }
-      });
-    }
+      }
+    });
+
+    // Store cleanup function for later
+    this.cleanupFunctions.push(cleanup);
   }
 
   private setupSidebarObserver() {
@@ -199,6 +310,7 @@ class ArborExtension {
     this.attachZoomControls();
     this.graphPanZoom.init();
     this.graphPanZoom.setOnScaleChange(() => this.updateZoomDisplay());
+    this.graphRenderer.setGraphPanZoom(this.graphPanZoom);
 
     this.sidebarInjected = true;
     console.log("✅ UI injected");
@@ -228,6 +340,29 @@ class ArborExtension {
       this.graphPanZoom.resetZoom();
       this.updateZoomDisplay();
     });
+
+    document
+      .getElementById("reset-layout-btn")
+      ?.addEventListener("click", () => {
+        this.graphRenderer.resetToAutoLayout();
+        // Re-render the graph with auto layout
+        if (this.state.currentTreeId) {
+          const tree = this.state.trees[this.state.currentTreeId];
+          if (tree) {
+            this.renderGraph();
+          }
+        }
+      });
+
+    // Listen for reset layout event from GraphRenderer
+    window.addEventListener("arbor-reset-layout", () => {
+      if (this.state.currentTreeId) {
+        const tree = this.state.trees[this.state.currentTreeId];
+        if (tree) {
+          this.renderGraph();
+        }
+      }
+    });
   }
 
   private updateZoomDisplay() {
@@ -239,12 +374,41 @@ class ArborExtension {
   }
 
   private async refreshSidebar() {
+    console.log("📋 [DRAG-DEBUG] REFRESH SIDEBAR START:", {
+      currentTreeId: this.state.currentTreeId,
+      treesCount: Object.keys(this.state.trees).length,
+      currentTree: this.state.currentTreeId
+        ? (() => {
+            const treeId = this.state.currentTreeId!;
+            const tree = this.state.trees[treeId];
+            return {
+              nodeCount: Object.keys(tree.nodes).length,
+              structure: Object.keys(tree.nodes).map((id) => {
+                const node = tree.nodes[id];
+                return {
+                  id,
+                  parentId: node?.parentId || null,
+                  children: node?.children || [],
+                };
+              }),
+            };
+          })()
+        : null,
+      timestamp: Date.now(),
+    });
+
     const untrackedChats = this.getUntrackedChats();
     await this.uiInjector.injectSidebar(
       this.state.trees,
       this.state.currentTreeId,
-      untrackedChats
+      untrackedChats,
     );
+
+    console.log("📋 [DRAG-DEBUG] REFRESH SIDEBAR COMPLETE - DOM state:", {
+      sidebarExists: !!document.getElementById("arbor-sidebar-container"),
+      treeNodesInDOM: document.querySelectorAll(".tree-node").length,
+      timestamp: Date.now(),
+    });
   }
 
   private getUntrackedChats(): AvailableChat[] {
@@ -266,47 +430,8 @@ class ArborExtension {
         const nodeId = (nodeEl as HTMLElement).dataset.nodeId;
         if (!nodeId) return;
 
-        // Make node draggable
-        const dragState = this.nodeInteractions.makeNodeDraggable(
-          nodeEl as HTMLElement,
-          nodeId,
-          async (id, pos) => {
-            if (this.state.currentTreeId) {
-              const tree = this.state.trees[this.state.currentTreeId];
-              await this.nodeManager.updateNodePosition(
-                id,
-                pos,
-                tree,
-                this.state.currentTreeId
-              );
-              this.renderGraph();
-            }
-          },
-          async (id, newParentId) => {
-            if (this.state.currentTreeId) {
-              const tree = this.state.trees[this.state.currentTreeId];
-              const success = await this.nodeManager.reparentNode(
-                id,
-                newParentId,
-                tree,
-                this.state.currentTreeId
-              );
-              if (success) {
-                this.showNotification("Node reparented! 🔄", "success");
-                this.renderGraph();
-              } else {
-                this.showNotification("Cannot reparent node", "error");
-              }
-            }
-          }
-        );
-
-        // Click handler (only if not dragged)
-        nodeEl.addEventListener("click", () => {
-          if (!dragState.hasMoved) {
-            this.handleNodeClick(nodeId);
-          }
-        });
+        // REMOVED: Old drag handler - now handled in GraphRenderer.makeDraggable
+        // Click handler handled by GraphRenderer as well
 
         // Context menu
         nodeEl.addEventListener("contextmenu", (e) => {
@@ -316,7 +441,7 @@ class ArborExtension {
             nodeId,
             mouseEvent.clientX,
             mouseEvent.clientY,
-            (action, id) => this.handleNodeAction(action, id)
+            (action, id) => this.handleNodeAction(action, id),
           );
         });
       });
@@ -339,7 +464,7 @@ class ArborExtension {
             nodeId,
             newTitle,
             tree,
-            this.state.currentTreeId
+            this.state.currentTreeId,
           );
           this.showNotification("Node renamed! ✏️", "success");
           this.refresh();
@@ -353,7 +478,7 @@ class ArborExtension {
             nodeId,
             color,
             tree,
-            this.state.currentTreeId
+            this.state.currentTreeId,
           );
           this.showNotification("Color updated! 🎨", "success");
           this.renderGraph();
@@ -363,14 +488,14 @@ class ArborExtension {
       case "shape":
         const shape = prompt(
           "Enter shape (circle, rounded, rectangle, diamond):",
-          node.shape || "rounded"
+          node.shape || "rounded",
         );
         if (shape) {
           await this.nodeManager.updateNodeShape(
             nodeId,
             shape,
             tree,
-            this.state.currentTreeId
+            this.state.currentTreeId,
           );
           this.showNotification("Shape updated! 🔷", "success");
           this.renderGraph();
@@ -391,7 +516,7 @@ class ArborExtension {
           nodeId,
           { x: 0, y: 0 },
           tree,
-          this.state.currentTreeId
+          this.state.currentTreeId,
         );
         this.showNotification("Position reset! 📍", "success");
         this.renderGraph();
@@ -446,22 +571,48 @@ class ArborExtension {
         break;
       case "reparentNode":
         if (data?.nodeId && data?.newParentId && this.state.currentTreeId) {
+          console.log("📥 [DRAG-DEBUG] REPARENT ACTION RECEIVED:", {
+            nodeId: data.nodeId,
+            newParentId: data.newParentId,
+            currentTreeId: this.state.currentTreeId,
+            sidebarNodeCount: document.querySelectorAll(`[data-node-id="${data.nodeId}"]`).length,
+            graphNodeCount: document.querySelectorAll(`.graph-node[data-node-id="${data.nodeId}"]`).length,
+            timestamp: Date.now(),
+          });
+
           const tree = this.state.trees[this.state.currentTreeId];
           const success = await this.nodeManager.reparentNode(
             data.nodeId,
             data.newParentId,
             tree,
-            this.state.currentTreeId
+            this.state.currentTreeId,
           );
           if (success) {
+            console.log("✅ [DRAG-DEBUG] REPARENT SUCCESS - Triggering refresh");
             this.showNotification("Node reparented! 🔄", "success");
             this.refresh();
+            console.log("🔄 [DRAG-DEBUG] REFRESH COMPLETE - Checking DOM:", {
+              sidebarNodeCount: document.querySelectorAll(`[data-node-id="${data.nodeId}"]`).length,
+              graphNodeCount: document.querySelectorAll(`.graph-node[data-node-id="${data.nodeId}"]`).length,
+              timestamp: Date.now(),
+            });
           } else {
+            console.log("❌ [DRAG-DEBUG] REPARENT FAILED");
             this.showNotification(
               "Cannot reparent node (would create cycle or invalid structure)",
-              "error"
+              "error",
             );
           }
+        }
+        break;
+      case "renameNode":
+        if (data?.nodeId && data?.newName && this.state.currentTreeId) {
+          await this.renameNode(data.nodeId, data.newName);
+        }
+        break;
+      case "renameTree":
+        if (data?.treeId && data?.newName) {
+          await this.renameTreeById(data.treeId, data.newName);
         }
         break;
     }
@@ -494,7 +645,7 @@ class ArborExtension {
     if (!currentChat) {
       this.showNotification(
         "You must be on a ChatGPT conversation page to create a branch",
-        "error"
+        "error",
       );
       return;
     }
@@ -517,27 +668,27 @@ class ArborExtension {
     if (!currentChat) {
       this.showNotification(
         "You must be on a ChatGPT conversation page to create a branch",
-        "error"
+        "error",
       );
       return;
     }
 
     // Use the current page's chat title (more robust method from platform)
-    const currentTitle =
-      this.platform === "chatgpt"
-        ? chatgptPlatform.detectChatTitle() || currentChat.title
-        : currentChat.title;
+    const platformAdapter = PlatformFactory.getActivePlatform();
+    const currentTitle = platformAdapter
+      ? platformAdapter.detectChatTitle() || currentChat.title
+      : currentChat.title;
 
     // Show initial loading notification
     const loadingNotification = this.showLoadingNotification(
-      "Extracting messages..."
+      "Extracting messages...",
     );
 
     try {
       // Update progress
       this.updateLoadingNotification(
         loadingNotification,
-        "Preparing context..."
+        "Preparing context...",
       );
 
       // Create branch context using the BranchContextManager with user-selected configuration
@@ -549,7 +700,8 @@ class ArborExtension {
         };
       }
 
-      const result = await this.branchContextManager.createBranchContext({
+      const branchManager = await this.getBranchContextManager();
+      const result = await branchManager.createBranchContext({
         parentTitle: currentTitle,
         connectionType: config.connectionType,
         formatType: config.formatType,
@@ -571,10 +723,22 @@ class ArborExtension {
         if (result.context) {
           alert(`Context (copy manually):\n\n${result.context}`);
         } else {
-          this.showNotification(
-            `Failed to create branch context: ${errorMessage}`,
-            "error"
-          );
+          // Provide user-friendly error message with suggestion
+          const isApiError =
+            errorMessage.toLowerCase().includes("api") ||
+            errorMessage.toLowerCase().includes("key") ||
+            errorMessage.toLowerCase().includes("gemini");
+          if (isApiError) {
+            this.showNotification(
+              "Unable to connect to AI service. Try using 'Smart' or 'Full History' format instead.",
+              "error",
+            );
+          } else {
+            this.showNotification(
+              `Couldn't create branch: ${errorMessage}`,
+              "error",
+            );
+          }
         }
         return;
       }
@@ -588,14 +752,14 @@ class ArborExtension {
         if (tree) {
           parentTreeId = this.state.currentTreeId;
           // Find the node that matches the current chat URL
-          const currentChatUrl =
-            this.platform === "chatgpt"
-              ? chatgptPlatform.detectCurrentChatUrl()
-              : currentChat.url;
+          const platformAdapter = PlatformFactory.getActivePlatform();
+          const currentChatUrl = platformAdapter
+            ? platformAdapter.detectCurrentChatUrl()
+            : currentChat.url;
 
           if (currentChatUrl) {
             const matchingNode = Object.values(tree.nodes).find(
-              (node) => node.url === currentChatUrl
+              (node) => node.url === currentChatUrl,
             );
             if (matchingNode) {
               parentNodeId = matchingNode.id;
@@ -606,17 +770,13 @@ class ArborExtension {
 
       // Show success notification
       this.showNotification(
-        "Opening new chat and pasting context automatically...",
-        "success"
+        "✓ Branch created! Opening new chat with conversation context...",
+        "success",
       );
 
       // Open new chat with context and parent info
       setTimeout(() => {
-        this.branchContextManager.openNewChat(
-          result.context,
-          parentNodeId,
-          parentTreeId
-        );
+        branchManager.openNewChat(result.context, parentNodeId, parentTreeId);
       }, 1000);
     } catch (error) {
       // Remove loading notification on error
@@ -626,7 +786,7 @@ class ArborExtension {
       const errorMessage = formatErrorForUI(error);
       this.showNotification(
         `Failed to create branch context: ${errorMessage}`,
-        "error"
+        "error",
       );
     }
   }
@@ -658,10 +818,48 @@ class ArborExtension {
     await this.treeManager.renameTree(
       this.state.currentTreeId,
       newName.trim(),
-      this.state.trees
+      this.state.trees,
     );
 
     await this.saveState();
+    this.showNotification(`Tree renamed to "${newName}"! ✏️`, "success");
+    this.refresh();
+  }
+
+  private async renameNode(nodeId: string, newName: string) {
+    if (!this.state.currentTreeId) {
+      this.showNotification("No tree selected", "error");
+      return;
+    }
+
+    const tree = this.state.trees[this.state.currentTreeId];
+    if (!tree || !tree.nodes[nodeId]) {
+      this.showNotification("Node not found", "error");
+      return;
+    }
+
+    tree.nodes[nodeId].title = newName.trim();
+    tree.nodes[nodeId].updatedAt = new Date().toISOString();
+    tree.updatedAt = new Date().toISOString();
+
+    await db.saveNode(tree.nodes[nodeId], this.state.currentTreeId);
+    await db.saveTree(tree);
+    await this.saveState();
+
+    this.showNotification(`Node renamed! ✏️`, "success");
+    this.refresh();
+  }
+
+  private async renameTreeById(treeId: string, newName: string) {
+    const tree = this.state.trees[treeId];
+    if (!tree) {
+      this.showNotification("Tree not found", "error");
+      return;
+    }
+
+    await this.treeManager.renameTree(treeId, newName.trim(), this.state.trees);
+    await this.saveState();
+
     this.showNotification(`Tree renamed to "${newName}"! ✏️`, "success");
     this.refresh();
   }
@@ -685,7 +883,7 @@ class ArborExtension {
       !confirm(
         `Delete "${treeName}"?\n\nThis will permanently delete:\n• The entire tree\n• All ${nodeCount} node${
           nodeCount !== 1 ? "s" : ""
-        } and their connections\n\nThis action cannot be undone.`
+        } and their connections\n\nThis action cannot be undone.`,
       )
     ) {
       return;
@@ -693,13 +891,13 @@ class ArborExtension {
 
     const result = await this.treeManager.deleteTree(
       this.state.currentTreeId,
-      this.state.trees
+      this.state.trees,
     );
 
     if (!result.success) {
       this.showNotification(
         `Failed to delete tree: ${result.error || "Unknown error"}`,
-        "error"
+        "error",
       );
       return;
     }
@@ -733,7 +931,7 @@ class ArborExtension {
     if (nodeId === tree.rootNodeId) {
       this.showNotification(
         "Cannot delete root node! Delete the tree instead.",
-        "error"
+        "error",
       );
       return;
     }
@@ -755,7 +953,7 @@ class ArborExtension {
 
     if (
       !confirm(
-        `Delete "${node.title}"?\n\nThis will permanently delete:\n• ${willDeleteCount} (including all children)\n• All connections to this branch\n\nThis action cannot be undone.`
+        `Delete "${node.title}"?\n\nThis will permanently delete:\n• ${willDeleteCount} (including all children)\n• All connections to this branch\n\nThis action cannot be undone.`,
       )
     ) {
       return;
@@ -764,13 +962,13 @@ class ArborExtension {
     const result = await this.nodeManager.deleteNode(
       nodeId,
       tree,
-      this.state.currentTreeId
+      this.state.currentTreeId,
     );
 
     if (!result.success) {
       this.showNotification(
         `Failed to delete node: ${result.error || "Unknown error"}`,
-        "error"
+        "error",
       );
       return;
     }
@@ -817,7 +1015,7 @@ class ArborExtension {
       chat.url,
       chat.platform,
       tree,
-      this.state.currentTreeId
+      this.state.currentTreeId,
     );
 
     this.showNotification(`Added "${chat.title}" to tree! ✅`, "success");
@@ -830,15 +1028,18 @@ class ArborExtension {
    */
   private async handleAutoPasteAndTreeAddition() {
     try {
-      // Check if we have stored context from branch creation
-      const context = sessionStorage.getItem("arbor_branch_context");
-      const parentNodeId = sessionStorage.getItem(
-        "arbor_branch_parent_node_id"
-      );
-      const parentTreeId = sessionStorage.getItem(
-        "arbor_branch_parent_tree_id"
-      );
-      const timestamp = sessionStorage.getItem("arbor_branch_timestamp");
+      // Check if we have stored context from branch creation (using secure chrome.storage.session)
+      const data = await chrome.storage.session.get([
+        "arbor_branch_context",
+        "arbor_branch_parent_node_id",
+        "arbor_branch_parent_tree_id",
+        "arbor_branch_timestamp",
+      ]);
+
+      const context = data.arbor_branch_context;
+      const parentNodeId = data.arbor_branch_parent_node_id;
+      const parentTreeId = data.arbor_branch_parent_tree_id;
+      const timestamp = data.arbor_branch_timestamp;
 
       if (!context || !timestamp) {
         return; // No branch context to handle
@@ -854,31 +1055,33 @@ class ArborExtension {
       }
 
       // If we're on the home page (new chat), paste the context
-      if (this.platform === "chatgpt" && !chatgptPlatform.isInConversation()) {
+      const platformAdapter = PlatformFactory.getActivePlatform();
+      if (platformAdapter && !platformAdapter.isInConversation()) {
         // Wait a bit for the page to fully load
         setTimeout(async () => {
-          const pasted = await chatgptPlatform.pasteIntoInput(context);
+          const pasted = await platformAdapter.pasteIntoInput(context);
           if (pasted) {
             console.log("🌳 Arbor: Context pasted successfully");
             this.showNotification(
-              "Context pasted! Send a message to create the branch.",
-              "success"
+              "Context added! The AI now has your conversation history. Continue chatting →",
+              "success",
             );
           } else {
             console.warn(
-              "🌳 Arbor: Failed to paste context, user will need to paste manually"
+              "🌳 Arbor: Failed to paste context, user will need to paste manually",
             );
+            // Detect OS for keyboard shortcut
+            const pasteKey = navigator.platform.includes("Mac")
+              ? "⌘V"
+              : "Ctrl+V";
             this.showNotification(
-              "Context is in clipboard - paste (Ctrl+V) to continue",
-              "info"
+              `Context copied! Paste it into the new chat (${pasteKey}) to continue`,
+              "info",
             );
           }
         }, 1000);
         // Navigation listener will handle adding to tree when chat is created
-      } else if (
-        this.platform === "chatgpt" &&
-        chatgptPlatform.isInConversation()
-      ) {
+      } else if (platformAdapter && platformAdapter.isInConversation()) {
         // We're already in a conversation - this might be the new chat
         // Wait a bit and then add it to the tree
         setTimeout(async () => {
@@ -895,7 +1098,7 @@ class ArborExtension {
    */
   private async addNewChatToTreeIfNeeded(
     parentNodeId: string | null,
-    parentTreeId: string | null
+    parentTreeId: string | null,
   ) {
     try {
       if (!parentNodeId || !parentTreeId) {
@@ -904,10 +1107,10 @@ class ArborExtension {
       }
 
       // Get current chat URL
-      const currentChatUrl =
-        this.platform === "chatgpt"
-          ? chatgptPlatform.detectCurrentChatUrl()
-          : window.location.href;
+      const platformAdapter = PlatformFactory.getActivePlatform();
+      const currentChatUrl = platformAdapter
+        ? platformAdapter.detectCurrentChatUrl()
+        : window.location.href;
 
       if (!currentChatUrl) {
         return;
@@ -928,7 +1131,7 @@ class ArborExtension {
       }
 
       const existingNode = Object.values(tree.nodes).find(
-        (node) => node.url === currentChatUrl
+        (node) => node.url === currentChatUrl,
       );
 
       if (existingNode) {
@@ -939,10 +1142,9 @@ class ArborExtension {
       }
 
       // Get chat title
-      const chatTitle =
-        this.platform === "chatgpt"
-          ? chatgptPlatform.detectChatTitle() || "New Branch"
-          : "New Branch";
+      const chatTitle = platformAdapter
+        ? platformAdapter.detectChatTitle() || "New Branch"
+        : "New Branch";
 
       // Add the chat to the tree as a child of the parent
       await this.nodeManager.createNode(
@@ -951,12 +1153,12 @@ class ArborExtension {
         currentChatUrl,
         this.platform,
         tree,
-        parentTreeId
+        parentTreeId,
       );
 
       this.showNotification(
         `Branch "${chatTitle}" added to tree! 🌿`,
-        "success"
+        "success",
       );
       this.refresh();
       this.renderGraph();
@@ -968,13 +1170,19 @@ class ArborExtension {
   }
 
   /**
-   * Clear stored branch context from sessionStorage
+   * Clear stored branch context from chrome.storage.session
    */
   private clearBranchContext() {
-    sessionStorage.removeItem("arbor_branch_context");
-    sessionStorage.removeItem("arbor_branch_parent_node_id");
-    sessionStorage.removeItem("arbor_branch_parent_tree_id");
-    sessionStorage.removeItem("arbor_branch_timestamp");
+    chrome.storage.session
+      .remove([
+        "arbor_branch_context",
+        "arbor_branch_parent_node_id",
+        "arbor_branch_parent_tree_id",
+        "arbor_branch_timestamp",
+      ])
+      .catch((error) => {
+        console.error("Failed to clear branch context:", error);
+      });
   }
 
   private async handleNodeClick(nodeId: string) {
@@ -1000,24 +1208,49 @@ class ArborExtension {
       (parentTitle, childTitle) => {
         this.showNotification(
           `Label updated: ${parentTitle} → ${childTitle}`,
-          "success"
+          "success",
         );
         this.renderGraph();
-      }
+      },
     );
   }
 
   private renderGraph() {
+    // Mark as dirty for potential re-render
+    this.isDirty = true;
+
+    // Debounce render calls (150ms)
+    if (this.renderDebounceTimer !== null) {
+      return; // Already scheduled
+    }
+
+    this.renderDebounceTimer = window.setTimeout(() => {
+      this.renderDebounceTimer = null;
+      this.performRender();
+    }, 150);
+  }
+
+  private performRender() {
     if (!this.state.currentTreeId) {
       this.uiInjector.hideGraph();
+      this.isDirty = false;
       return;
     }
 
     const tree = this.state.trees[this.state.currentTreeId];
     if (!tree) {
       this.uiInjector.hideGraph();
+      this.isDirty = false;
       return;
     }
+
+    // Skip render if not dirty and same tree
+    if (!this.isDirty && this.lastRenderedTreeId === this.state.currentTreeId) {
+      return;
+    }
+
+    this.isDirty = false;
+    this.lastRenderedTreeId = this.state.currentTreeId;
 
     // Ensure graph container exists
     const graphContainer = document.getElementById("arbor-graph-container");
@@ -1029,15 +1262,15 @@ class ArborExtension {
     this.uiInjector.showGraph();
 
     // Small delay to ensure DOM is ready
-    setTimeout(() => {
+    setTimeout(async () => {
       const content = document.getElementById("graph-content");
       if (!content) {
         console.warn("Graph content container not found, retrying...");
-        setTimeout(() => this.renderGraph(), 100);
+        setTimeout(() => this.performRender(), 100);
         return;
       }
 
-      this.graphRenderer.setCurrentTree(this.state.currentTreeId);
+      await this.graphRenderer.setCurrentTree(this.state.currentTreeId);
       this.graphRenderer.setCurrentNode(this.state.currentNodeId);
       this.graphRenderer.renderGraph(tree);
 
@@ -1066,7 +1299,7 @@ class ArborExtension {
     if (currentChat && this.state.currentTreeId) {
       const tree = this.state.trees[this.state.currentTreeId];
       const existingNode = Object.values(tree.nodes).find(
-        (node) => node.url === currentChat.url
+        (node) => node.url === currentChat.url,
       );
 
       if (existingNode) {
@@ -1076,23 +1309,31 @@ class ArborExtension {
   }
 
   private refresh() {
+    console.log("🔄 [DRAG-DEBUG] REFRESH START:", {
+      currentTreeId: this.state.currentTreeId,
+      treeNodeCount: this.state.currentTreeId
+        ? Object.keys(this.state.trees[this.state.currentTreeId].nodes).length
+        : 0,
+      timestamp: Date.now(),
+    });
     this.refreshSidebar();
+    console.log("🔄 [DRAG-DEBUG] SIDEBAR REFRESHED");
     this.renderGraph();
+    console.log("🔄 [DRAG-DEBUG] GRAPH RENDERED");
   }
 
-  private showNotification(message: string, type: "success" | "error" | "info") {
+  private showNotification(
+    message: string,
+    type: "success" | "error" | "info",
+  ) {
     console.log(`[${type.toUpperCase()}] ${message}`);
 
     // Simple toast notification
     const toast = document.createElement("div");
-    const backgroundColor = 
-      type === "success" ? "#2dd4a7" : 
-      type === "error" ? "#ef4444" : 
-      "#3b82f6"; // blue for info
-    const textColor = 
-      type === "success" ? "#0c0f0e" : 
-      "#fff"; // white for error and info
-    
+    const backgroundColor =
+      type === "success" ? "#2dd4a7" : type === "error" ? "#ef4444" : "#3b82f6"; // blue for info
+    const textColor = type === "success" ? "#0c0f0e" : "#fff"; // white for error and info
+
     toast.style.cssText = `
         position: fixed;
       top: 20px;
@@ -1179,20 +1420,62 @@ class ArborExtension {
    */
   private updateLoadingNotification(
     toast: HTMLElement,
-    newMessage: string
+    newMessage: string,
   ): void {
     const textElement = toast.querySelector("span");
     if (textElement) {
       textElement.textContent = newMessage;
     }
   }
+
+  /**
+   * Cleanup all resources and event listeners
+   * Call this when the extension is being unloaded
+   */
+  public cleanup(): void {
+    // Run all cleanup functions
+    this.cleanupFunctions.forEach((cleanup) => cleanup());
+    this.cleanupFunctions = [];
+
+    // Cleanup branch context manager if it was loaded
+    if (
+      this.branchContextManager &&
+      typeof this.branchContextManager.cleanup === "function"
+    ) {
+      this.branchContextManager.cleanup();
+    }
+
+    // Cleanup platform-specific resources
+    const platformAdapter = PlatformFactory.getActivePlatform();
+    if (platformAdapter) {
+      platformAdapter.cleanup();
+    }
+
+    console.log("🌳 Arbor: Cleanup complete");
+  }
 }
 
 // Initialize extension
+console.log(
+  `🌳 Arbor: Content script loaded! Checking platform on hostname: ${window.location.hostname}`,
+);
+console.log(`🌳 Arbor: Full URL: ${window.location.href}`);
+console.log(`🌳 Arbor: Document ready state: ${document.readyState}`);
+
 const platform = detectPlatform();
 if (platform) {
-  console.log(`🌳 Arbor: Detected ${platform}`);
-  new ArborExtension(platform);
+  console.log(`🌳 Arbor: ✅ Platform detected: ${platform}`);
+  try {
+    new ArborExtension(platform);
+    console.log(`🌳 Arbor: ✅ Extension initialized successfully`);
+  } catch (error) {
+    console.error(`🌳 Arbor: ❌ Failed to initialize extension:`, error);
+  }
 } else {
-  console.log("🌳 Arbor: Platform not supported");
+  console.error(
+    `🌳 Arbor: ❌ Platform not supported on ${window.location.hostname}`,
+  );
+  console.log(
+    "🌳 Arbor: Available platforms: chatgpt, gemini, claude, perplexity",
+  );
 }

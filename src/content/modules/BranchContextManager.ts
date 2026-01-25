@@ -9,7 +9,7 @@
  * - Opening new chat
  */
 
-import { chatgptPlatform } from "../../platforms/chatgpt";
+import { PlatformFactory } from "../../platforms/factory";
 import type { Platform, ConnectionType } from "../../types";
 import type { Message } from "./context/ContextFormatter";
 import { HybridFormatter } from "./context/formatters/HybridFormatter";
@@ -30,21 +30,20 @@ export interface BranchContextOptions {
 }
 
 export class BranchContextManager {
-  private platform: "chatgpt" | "gemini" | "perplexity";
+  private platform: "chatgpt" | "gemini" | "claude" | "perplexity";
   private platformInstance: Platform;
   private formatters: Map<string, ContextFormatter>;
+  private worker: Worker | null = null;
 
-  constructor(platform: "chatgpt" | "gemini" | "perplexity") {
+  constructor(platform: "chatgpt" | "gemini" | "claude" | "perplexity") {
     this.platform = platform;
 
-    // Get platform instance (similar to ChatDetector pattern)
-    // Currently only ChatGPT is fully implemented
-    if (platform === "chatgpt") {
-      this.platformInstance = chatgptPlatform;
-    } else {
-      // Fallback - we'll need to implement other platforms later
-      this.platformInstance = chatgptPlatform;
+    // Get platform instance using factory
+    const platformAdapter = PlatformFactory.getPlatformByName(platform);
+    if (!platformAdapter) {
+      throw new Error(`Platform ${platform} not supported`);
     }
+    this.platformInstance = platformAdapter;
 
     // Initialize formatters (will be updated with LLM service if available)
     this.formatters = new Map();
@@ -105,6 +104,51 @@ export class BranchContextManager {
     }
   }
 
+  private getWorker(): Worker {
+    if (!this.worker) {
+      this.worker = new Worker(chrome.runtime.getURL('summarization.worker.js'));
+    }
+    return this.worker;
+  }
+
+  private async processWithWorker(
+    messages: Message[],
+    options: any
+  ): Promise<string> {
+    const worker = this.getWorker();
+    
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Worker processing timeout after 30s'));
+      }, 30000);
+      
+      worker.onmessage = (e: MessageEvent) => {
+        clearTimeout(timeout);
+        const response = e.data as { success: boolean; summary?: string; error?: string };
+        if (response.success && response.summary) {
+          resolve(response.summary);
+        } else {
+          reject(new Error(response.error || 'Worker processing failed'));
+        }
+      };
+      
+      worker.onerror = (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      };
+      
+      const request = { messages, options };
+      worker.postMessage(request);
+    });
+  }
+
+  public cleanup(): void {
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
+  }
+
   /**
    * Create branch context and copy to clipboard
    * Returns the generated context string
@@ -126,16 +170,50 @@ export class BranchContextManager {
         progressCallback,
       } = options;
 
-      // Get all messages from the current chat (we'll process them in the formatter)
+      // Get all messages from the current chat with memory limits
       if (progressCallback)
         progressCallback("Extracting messages from conversation...");
+      
+      // Stream message processing with memory limits
       const allMessages = this.platformInstance.extractMessages();
-
-      // Convert to Message format
-      const messages: Message[] = allMessages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
+      
+      // Memory limit: 100MB worth of text (rough estimate: ~100 chars per KB)
+      const MAX_MEMORY_BYTES = 100 * 1024 * 1024;
+      const ESTIMATED_CHARS_PER_BYTE = 2; // UTF-16 uses 2 bytes per char
+      const MAX_CHARS = MAX_MEMORY_BYTES / ESTIMATED_CHARS_PER_BYTE;
+      
+      let totalChars = 0;
+      let truncated = false;
+      
+      // Convert to Message format with progressive filtering
+      const messages: Message[] = [];
+      
+      for (const msg of allMessages) {
+        const msgLength = msg.content.length;
+        
+        // Check if adding this message would exceed memory limit
+        if (totalChars + msgLength > MAX_CHARS) {
+          console.warn(`🌳 Arbor: Memory limit reached, truncating messages at ${messages.length} messages`);
+          truncated = true;
+          break;
+        }
+        
+        messages.push({
+          role: msg.role,
+          content: msg.content,
+        });
+        
+        totalChars += msgLength;
+        
+        // Early exit if we have enough messages for the requested format
+        if (messages.length >= (messageCount || 100)) {
+          break;
+        }
+      }
+      
+      if (truncated && progressCallback) {
+        progressCallback(`Processing ${messages.length} messages (memory limit reached)...`);
+      }
 
       // Get selected text (if any)
       const selectedText = this.platformInstance.getSelectedText() || undefined;
@@ -195,13 +273,28 @@ export class BranchContextManager {
         }
       } else {
         // Using non-summary format (hybrid/conversation)
-        context = formatter.format(messages, {
-          parentTitle,
-          selectedText,
-          connectionType,
-          messageLength,
-          messageCount,
-        });
+        // Use Web Worker for heavy text processing to prevent UI freezing
+        try {
+          if (progressCallback) progressCallback("Processing conversation...");
+          
+          context = await this.processWithWorker(messages, {
+            parentTitle,
+            selectedText,
+            connectionType,
+            messageLength,
+            messageCount,
+          });
+        } catch (workerError) {
+          // Fallback to main thread if worker fails
+          console.warn('Worker processing failed, using main thread:', workerError);
+          context = formatter.format(messages, {
+            parentTitle,
+            selectedText,
+            connectionType,
+            messageLength,
+            messageCount,
+          });
+        }
       }
 
       // Copy to clipboard

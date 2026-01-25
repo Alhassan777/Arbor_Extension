@@ -225,12 +225,35 @@ export class BranchConnectionTypeDialog {
                 />
               </div>
 
+              <!-- What Happens Next Preview -->
+              <div id="what-happens-next-preview" style="
+                margin-top: 16px;
+                padding: 12px;
+                background: rgba(45, 212, 167, 0.08);
+                border: 1px solid rgba(45, 212, 167, 0.2);
+                border-radius: 8px;
+              ">
+                <div style="color: #2dd4a7; font-size: 11px; font-weight: 600; margin-bottom: 6px;">
+                  WHAT HAPPENS NEXT
+                </div>
+                <div style="color: #9caba3; font-size: 12px; line-height: 1.5;">
+                  1. We'll create a summary of your conversation so far<br>
+                  2. Open a new chat with this context already pasted<br>
+                  3. You can immediately continue the conversation
+                </div>
+                <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(45, 212, 167, 0.15);">
+                  <div style="color: #9caba3; font-size: 11px;">
+                    <strong style="color: #e8efe9;">Estimated context:</strong> <span id="context-estimate">~450 words (3 message pairs + summary)</span>
+                  </div>
+                </div>
+              </div>
+
               <div style="
                 margin-top: 12px;
                 padding-top: 12px;
                 border-top: 1px solid #2a3530;
               ">
-                <div style="
+                <div id="advanced-options-toggle" style="
                   color: #9caba3;
                   font-size: 11px;
                   text-transform: uppercase;
@@ -240,9 +263,15 @@ export class BranchConnectionTypeDialog {
                   display: flex;
                   align-items: center;
                   gap: 6px;
-                ">
-                  <span>⚙️</span>
-                  <span>Advanced Options</span>
+                  justify-content: space-between;
+                  cursor: pointer;
+                  transition: color 0.2s;
+                " onmouseover="this.style.color='#2dd4a7'" onmouseout="this.style.color='#9caba3'">
+                  <span style="display: flex; align-items: center; gap: 6px;">
+                    <span>⚙️</span>
+                    <span>Advanced Options</span>
+                  </span>
+                  <span id="advanced-toggle-icon" style="font-size: 14px; transition: transform 0.2s;">▼</span>
                 </div>
               </div>
 
@@ -252,6 +281,7 @@ export class BranchConnectionTypeDialog {
                 background: #131917;
                 border: 1px solid #2a3530;
                 border-radius: 8px;
+                display: none;
               ">
               <div style="margin-bottom: 16px;">
                 <label style="
@@ -267,22 +297,31 @@ export class BranchConnectionTypeDialog {
                   <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; border-radius: 4px; transition: all 0.2s;" onmouseover="this.style.background='#1c2420'" onmouseout="this.style.background='transparent'">
                     <input type="radio" name="format-type" value="hybrid" checked style="accent-color: #2dd4a7; cursor: pointer;">
                     <div style="flex: 1;">
-                      <div style="color: #e8efe9; font-size: 13px; font-weight: 500;">Hybrid</div>
-                      <div style="color: #6a7570; font-size: 11px;">Brief summary + last few message pairs</div>
+                      <div style="color: #e8efe9; font-size: 13px; font-weight: 500;">Smart (Recommended)</div>
+                      <div style="color: #6a7570; font-size: 11px;">
+                        Quick summary + recent messages (last 3 exchanges)
+                        <span style="color: #2dd4a7; margin-left: 4px;">• No AI needed</span>
+                      </div>
                     </div>
                   </label>
                   <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; border-radius: 4px; transition: all 0.2s;" onmouseover="this.style.background='#1c2420'" onmouseout="this.style.background='transparent'">
                     <input type="radio" name="format-type" value="conversation" style="accent-color: #2dd4a7; cursor: pointer;">
                     <div style="flex: 1;">
-                      <div style="color: #e8efe9; font-size: 13px; font-weight: 500;">Conversation</div>
-                      <div style="color: #6a7570; font-size: 11px;">Full conversation format</div>
+                      <div style="color: #e8efe9; font-size: 13px; font-weight: 500;">Full History</div>
+                      <div style="color: #6a7570; font-size: 11px;">
+                        Include recent conversation word-for-word (last 10 messages)
+                        <span style="color: #2dd4a7; margin-left: 4px;">• No AI needed</span>
+                      </div>
                     </div>
                   </label>
                   <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px; border-radius: 4px; transition: all 0.2s;" onmouseover="this.style.background='#1c2420'" onmouseout="this.style.background='transparent'">
                     <input type="radio" name="format-type" value="summary" style="accent-color: #2dd4a7; cursor: pointer;">
                     <div style="flex: 1;">
-                      <div style="color: #e8efe9; font-size: 13px; font-weight: 500;">Summary</div>
-                      <div style="color: #6a7570; font-size: 11px;">AI-powered summary (sends all messages to API)</div>
+                      <div style="color: #e8efe9; font-size: 13px; font-weight: 500;">AI Summary</div>
+                      <div style="color: #6a7570; font-size: 11px;">
+                        AI creates intelligent summary of conversation
+                        <span style="color: #c9a66b; margin-left: 4px;">• Uses Gemini API (requires key)</span>
+                      </div>
                     </div>
                   </label>
                 </div>
@@ -726,6 +765,21 @@ export class BranchConnectionTypeDialog {
               value === "full" ? "full" : parseInt(value, 10);
           });
         });
+
+      // Handle advanced options toggle
+      const advancedOptionsToggle = modal.querySelector("#advanced-options-toggle");
+      const advancedOptionsSection = modal.querySelector("#advanced-options-section");
+      const advancedToggleIcon = modal.querySelector("#advanced-toggle-icon");
+      
+      if (advancedOptionsToggle && advancedOptionsSection) {
+        advancedOptionsToggle.addEventListener("click", () => {
+          const isHidden = (advancedOptionsSection as HTMLElement).style.display === "none";
+          (advancedOptionsSection as HTMLElement).style.display = isHidden ? "block" : "none";
+          if (advancedToggleIcon) {
+            (advancedToggleIcon as HTMLElement).style.transform = isHidden ? "rotate(180deg)" : "rotate(0deg)";
+          }
+        });
+      }
 
       // Handle confirm button
       modal

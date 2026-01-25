@@ -27,41 +27,64 @@ function redactApiKey(key: string | null | undefined): string {
 }
 
 /**
- * Derive encryption key from extension ID
- * This ensures each extension installation has a unique key
+ * Storage key for the master encryption key
  */
-async function deriveEncryptionKey(): Promise<CryptoKey> {
+const MASTER_KEY_STORAGE = "arbor_master_encryption_key";
+
+/**
+ * Generate or retrieve unique per-installation encryption key
+ * This ensures each extension installation has a truly unique, random key
+ * SECURITY: This provides better security than deriving from extension ID (which is public)
+ */
+async function getMasterEncryptionKey(): Promise<CryptoKey> {
   try {
-    // Get extension ID as base for key derivation
-    const extensionId = chrome.runtime.id;
-    
-    // Import extension ID as key material
-    const keyMaterial = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(extensionId + ENCRYPTION_KEY_NAME),
-      { name: "PBKDF2" },
-      false,
-      ["deriveKey"]
-    );
-    
-    // Derive AES-GCM key
-    const key = await crypto.subtle.deriveKey(
-      {
-        name: "PBKDF2",
-        salt: new TextEncoder().encode(extensionId),
-        iterations: 100000,
-        hash: "SHA-256",
-      },
-      keyMaterial,
+    // Try to retrieve existing key
+    const stored = await new Promise<any>((resolve) => {
+      chrome.storage.local.get([MASTER_KEY_STORAGE], (result) => {
+        resolve(result[MASTER_KEY_STORAGE]);
+      });
+    });
+
+    if (stored?.keyData) {
+      // Import existing key from storage
+      const keyBytes = Uint8Array.from(atob(stored.keyData), c => c.charCodeAt(0));
+      return await crypto.subtle.importKey(
+        "raw",
+        keyBytes,
+        { name: ENCRYPTION_ALGORITHM, length: KEY_LENGTH },
+        false,
+        ["encrypt", "decrypt"]
+      );
+    }
+
+    // Generate new random key (first-time installation)
+    const key = await crypto.subtle.generateKey(
       { name: ENCRYPTION_ALGORITHM, length: KEY_LENGTH },
-      false,
+      true, // extractable (so we can store it)
       ["encrypt", "decrypt"]
     );
+
+    // Export and store the key for future use
+    const exported = await crypto.subtle.exportKey("raw", key);
+    const keyData = btoa(String.fromCharCode(...new Uint8Array(exported)));
     
+    await new Promise<void>((resolve) => {
+      chrome.storage.local.set({ [MASTER_KEY_STORAGE]: { keyData } }, () => {
+        resolve();
+      });
+    });
+
     return key;
   } catch (error) {
-    throw new Error(`Failed to derive encryption key: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Failed to get master encryption key: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+/**
+ * Get encryption key (wrapper for backward compatibility)
+ */
+async function deriveEncryptionKey(): Promise<CryptoKey> {
+  return await getMasterEncryptionKey();
 }
 
 /**
@@ -139,6 +162,7 @@ function isEncrypted(value: any): boolean {
 /**
  * Validate API key format
  * Gemini API keys start with "AIza" and are typically 39+ characters
+ * SECURITY: Enhanced with length limits and character validation to prevent DoS/injection attacks
  */
 export function validateApiKeyFormat(key: string): { valid: boolean; error?: string } {
   if (!key || typeof key !== "string") {
@@ -147,12 +171,22 @@ export function validateApiKeyFormat(key: string): { valid: boolean; error?: str
 
   const trimmed = key.trim();
 
+  // Maximum length check to prevent DoS attacks
+  if (trimmed.length > 200) {
+    return { valid: false, error: "API key is too long (maximum 200 characters)" };
+  }
+
   if (trimmed.length < 30) {
     return { valid: false, error: "API key is too short (minimum 30 characters)" };
   }
 
   if (!trimmed.startsWith("AIza")) {
     return { valid: false, error: "Invalid API key format (must start with 'AIza')" };
+  }
+  
+  // Only allow alphanumeric characters, hyphens, and underscores (common in API keys)
+  if (!/^[A-Za-z0-9_-]+$/.test(trimmed)) {
+    return { valid: false, error: "API key contains invalid characters (only alphanumeric, hyphens, and underscores allowed)" };
   }
 
   return { valid: true };

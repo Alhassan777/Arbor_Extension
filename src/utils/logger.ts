@@ -29,18 +29,36 @@ const isProduction = (() => {
 
 /**
  * Redact API keys and other sensitive data from log messages
+ * SECURITY: Enhanced with additional patterns to prevent sensitive data leakage
  */
 function redactSensitiveData(message: string): string {
   if (!message || typeof message !== 'string') {
     return message;
   }
   
-  // Redact API keys (AIza...)
+  // Redact Gemini API keys (AIza...)
   let redacted = message.replace(/AIza[^\s"']+/g, 'AIza...****');
   
-  // Redact potential API keys in URLs
+  // Redact potential API keys in URLs (query parameters)
   redacted = redacted.replace(/[?&]key=([^&\s"']+)/gi, '?key=****');
   redacted = redacted.replace(/[?&]api_key=([^&\s"']+)/gi, '?api_key=****');
+  
+  // Redact Bearer tokens
+  redacted = redacted.replace(/Bearer\s+[^\s"']+/gi, 'Bearer ****');
+  
+  // Redact Authorization headers in JSON/objects
+  redacted = redacted.replace(/"Authorization":\s*"[^"]+"/gi, '"Authorization": "****"');
+  redacted = redacted.replace(/'Authorization':\s*'[^']+'/gi, "'Authorization': '****'");
+  
+  // Redact X-API-Key headers
+  redacted = redacted.replace(/"X-API-Key":\s*"[^"]+"/gi, '"X-API-Key": "****"');
+  redacted = redacted.replace(/'X-API-Key':\s*'[^']+'/gi, "'X-API-Key': '****'");
+  
+  // Redact email addresses (PII)
+  redacted = redacted.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '***@***.***');
+  
+  // Redact potential tokens (long alphanumeric strings that look like tokens)
+  redacted = redacted.replace(/\b[A-Za-z0-9_-]{40,}\b/g, '****TOKEN****');
   
   return redacted;
 }

@@ -14,7 +14,7 @@ export interface AvailableChat {
   id: string;
   title: string;
   url: string;
-  platform: "chatgpt" | "gemini" | "perplexity";
+  platform: "chatgpt" | "gemini" | "claude" | "perplexity";
 }
 
 export class UIInjector {
@@ -42,24 +42,53 @@ export class UIInjector {
     currentTreeId: string | null,
     untrackedChats: AvailableChat[]
   ) {
+    console.log("💉 [DRAG-DEBUG] INJECT SIDEBAR START:", {
+      currentTreeId,
+      treeCount: Object.keys(trees).length,
+      currentTree: currentTreeId
+        ? {
+            nodeCount: Object.keys(trees[currentTreeId].nodes).length,
+            nodes: Object.keys(trees[currentTreeId].nodes).map((id) => ({
+              id,
+              title: trees[currentTreeId].nodes[id].title,
+              parentId: trees[currentTreeId].nodes[id].parentId,
+              children: trees[currentTreeId].nodes[id].children,
+            })),
+          }
+        : null,
+      timestamp: Date.now(),
+    });
+
     let sidebar = document.getElementById("arbor-sidebar-container");
 
     if (!sidebar) {
+      console.log("💉 [DRAG-DEBUG] Creating new sidebar container");
       sidebar = document.createElement("div");
       sidebar.id = "arbor-sidebar-container";
       document.body.insertBefore(sidebar, document.body.firstChild);
       // Sidebar overlays, no need to adjust body margins
+    } else {
+      console.log("💉 [DRAG-DEBUG] Reusing existing sidebar container, replacing innerHTML");
     }
 
     // Check API key availability
     const hasApiKey = await this.checkApiKeyAvailability();
 
+    const htmlBeforeRender = sidebar.innerHTML.substring(0, 200);
     sidebar.innerHTML = SidebarRenderer.render(
       trees,
       currentTreeId,
       untrackedChats,
       hasApiKey
     );
+    const htmlAfterRender = sidebar.innerHTML.substring(0, 200);
+
+    console.log("💉 [DRAG-DEBUG] INJECT SIDEBAR - HTML replaced:", {
+      htmlChanged: htmlBeforeRender !== htmlAfterRender,
+      nodesInDOM: sidebar.querySelectorAll(".tree-node").length,
+      timestamp: Date.now(),
+    });
+
     this.sidebarListeners.attach();
     this.toggleButtonsManager.inject();
     // Sync button state with sidebar visibility (sidebar starts visible)

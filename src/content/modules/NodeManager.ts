@@ -6,9 +6,9 @@ export class NodeManager {
     parentId: string | null,
     title: string,
     url: string,
-    platform: "chatgpt" | "gemini" | "perplexity",
+    platform: "chatgpt" | "gemini" | "claude" | "perplexity",
     tree: ChatTree,
-    treeId: string
+    treeId: string,
   ): Promise<ChatNode> {
     const nodeId = `node-${Date.now()}-${Math.random()
       .toString(36)
@@ -40,7 +40,7 @@ export class NodeManager {
   async deleteNode(
     nodeId: string,
     tree: ChatTree,
-    treeId: string
+    treeId: string,
   ): Promise<{ success: boolean; error?: string }> {
     const node = tree.nodes[nodeId];
     if (!node) {
@@ -100,7 +100,7 @@ export class NodeManager {
     nodeId: string,
     position: { x: number; y: number },
     tree: ChatTree,
-    treeId: string
+    treeId: string,
   ): Promise<void> {
     const node = tree.nodes[nodeId];
     if (!node) return;
@@ -116,35 +116,78 @@ export class NodeManager {
     nodeId: string,
     newParentId: string,
     tree: ChatTree,
-    treeId: string
+    treeId: string,
   ): Promise<boolean> {
     const node = tree.nodes[nodeId];
     const newParent = tree.nodes[newParentId];
 
-    if (!node || !newParent) return false;
+    console.log("🔄 [DRAG-DEBUG] REPARENT NODE START:", {
+      nodeId,
+      nodeTitle: node?.title,
+      oldParentId: node?.parentId,
+      newParentId,
+      newParentTitle: newParent?.title,
+      nodeExists: !!node,
+      newParentExists: !!newParent,
+      timestamp: Date.now(),
+    });
+
+    if (!node || !newParent) {
+      console.log("❌ [DRAG-DEBUG] REPARENT FAILED: Node or parent not found");
+      return false;
+    }
 
     // Prevent circular dependencies
     if (this.wouldCreateCycle(nodeId, newParentId, tree)) {
+      console.log("❌ [DRAG-DEBUG] REPARENT FAILED: Would create cycle");
       return false;
     }
 
     // Prevent making node its own parent or root
     if (nodeId === newParentId || nodeId === tree.rootNodeId) {
+      console.log("❌ [DRAG-DEBUG] REPARENT FAILED: Self-parent or root node");
       return false;
     }
 
     // Remove from old parent
+    const oldParentId = node.parentId;
     if (node.parentId && tree.nodes[node.parentId]) {
       const oldParent = tree.nodes[node.parentId];
+      const childrenBefore = [...oldParent.children];
       oldParent.children = oldParent.children.filter((id) => id !== nodeId);
+      console.log("🗑️ [DRAG-DEBUG] REMOVED FROM OLD PARENT:", {
+        oldParentId: node.parentId,
+        childrenBefore,
+        childrenAfter: oldParent.children,
+        removedNodeId: nodeId,
+      });
     }
 
     // Add to new parent
+    const newParentChildrenBefore = [...newParent.children];
     node.parentId = newParentId;
     newParent.children.push(nodeId);
+    console.log("➕ [DRAG-DEBUG] ADDED TO NEW PARENT:", {
+      newParentId,
+      childrenBefore: newParentChildrenBefore,
+      childrenAfter: newParent.children,
+      addedNodeId: nodeId,
+    });
 
     await db.saveTree(tree);
     await db.saveNode(node, treeId);
+
+    console.log("✅ [DRAG-DEBUG] REPARENT COMPLETE:", {
+      nodeId,
+      oldParentId,
+      newParentId,
+      treeStructure: Object.keys(tree.nodes).map((id) => ({
+        id,
+        parentId: tree.nodes[id].parentId,
+        children: tree.nodes[id].children,
+      })),
+      timestamp: Date.now(),
+    });
 
     return true;
   }
@@ -152,7 +195,7 @@ export class NodeManager {
   private wouldCreateCycle(
     nodeId: string,
     newParentId: string,
-    tree: ChatTree
+    tree: ChatTree,
   ): boolean {
     let current = newParentId;
     const visited = new Set<string>();
@@ -173,7 +216,7 @@ export class NodeManager {
     nodeId: string,
     newTitle: string,
     tree: ChatTree,
-    treeId: string
+    treeId: string,
   ): Promise<void> {
     const node = tree.nodes[nodeId];
     if (!node) return;
@@ -189,7 +232,7 @@ export class NodeManager {
     nodeId: string,
     color: string,
     tree: ChatTree,
-    treeId: string
+    treeId: string,
   ): Promise<void> {
     const node = tree.nodes[nodeId];
     if (!node) return;
@@ -204,7 +247,7 @@ export class NodeManager {
     nodeId: string,
     shape: string,
     tree: ChatTree,
-    treeId: string
+    treeId: string,
   ): Promise<void> {
     const node = tree.nodes[nodeId];
     if (!node) return;

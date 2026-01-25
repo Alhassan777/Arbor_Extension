@@ -2,11 +2,16 @@
 import { ChatNode, ChatTree, ExtensionState } from '../types';
 
 const DB_NAME = 'ArborDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Version 2 - stable schema
 
 class ArborDatabase {
   private db: IDBDatabase | null = null;
   private initPromise: Promise<void> | null = null;
+  
+  // Batch write optimization (currently unused, kept for future use)
+  private writeQueue: Array<{ type: 'tree' | 'node', data: any, treeId?: string }> = [];
+  private flushTimer: number | null = null;
+  private readonly FLUSH_DELAY = 50; // ms - reduced from 100ms
 
   async init(): Promise<void> {
     // If already initialized, return immediately
@@ -36,17 +41,21 @@ class ArborDatabase {
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
 
-        // Create object stores
+        // Create trees store
         if (!db.objectStoreNames.contains('trees')) {
           db.createObjectStore('trees', { keyPath: 'id' });
         }
 
+        // Create nodes store with essential indices only
+        let nodeStore: IDBObjectStore;
         if (!db.objectStoreNames.contains('nodes')) {
-          const nodeStore = db.createObjectStore('nodes', { keyPath: 'id' });
+          nodeStore = db.createObjectStore('nodes', { keyPath: 'id' });
+          // Add only essential indices
           nodeStore.createIndex('treeId', 'treeId', { unique: false });
           nodeStore.createIndex('url', 'url', { unique: false });
         }
 
+        // Create state store
         if (!db.objectStoreNames.contains('state')) {
           db.createObjectStore('state', { keyPath: 'key' });
         }
@@ -61,6 +70,12 @@ class ArborDatabase {
     const transaction = this.db!.transaction(['trees'], 'readwrite');
     const store = transaction.objectStore('trees');
     await this.promisify(store.put(tree));
+  }
+
+  // Batch save tree (queued)
+  saveTreeBatched(tree: ChatTree): void {
+    this.writeQueue.push({ type: 'tree', data: tree });
+    this.scheduleFlush();
   }
 
   async getTree(treeId: string): Promise<ChatTree | null> {
@@ -89,6 +104,12 @@ class ArborDatabase {
     await this.promisify(store.put({ ...node, treeId }));
   }
 
+  // Batch save node (queued)
+  saveNodeBatched(node: ChatNode, treeId: string): void {
+    this.writeQueue.push({ type: 'node', data: node, treeId });
+    this.scheduleFlush();
+  }
+
   async getNode(nodeId: string): Promise<ChatNode | null> {
     const transaction = this.db!.transaction(['nodes'], 'readonly');
     const store = transaction.objectStore('nodes');
@@ -111,6 +132,10 @@ class ArborDatabase {
     // Remove treeId from each node
     return nodes.map(({ treeId, ...node }) => node as ChatNode);
   }
+
+  // Removed unused compound index queries (getNodesByTreeAndPlatform, getRecentNodes)
+  // These relied on compound indices that were slowing down writes without providing benefits
+  // Can be re-added if needed in the future
 
   async findNodeByUrl(url: string): Promise<ChatNode | null> {
     const transaction = this.db!.transaction(['nodes'], 'readonly');
@@ -185,6 +210,84 @@ class ArborDatabase {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
+  }
+
+  // Batch write optimization methods
+  private scheduleFlush(): void {
+    if (this.flushTimer !== null) {
+      return; // Already scheduled
+    }
+
+    this.flushTimer = window.setTimeout(() => {
+      this.flushWrites().catch(err => {
+        console.error('Failed to flush writes:', err);
+      });
+    }, this.FLUSH_DELAY);
+  }
+
+  private async flushWrites(): Promise<void> {
+    this.flushTimer = null;
+
+    if (this.writeQueue.length === 0) {
+      return;
+    }
+
+    // Take current queue and clear it
+    const queue = this.writeQueue.slice();
+    this.writeQueue = [];
+
+    if (!this.db) {
+      console.warn('Database not initialized, skipping flush');
+      return;
+    }
+
+    try {
+      // Group by store type for efficient transactions
+      const trees = queue.filter(item => item.type === 'tree');
+      const nodes = queue.filter(item => item.type === 'node');
+
+      // Batch write trees
+      if (trees.length > 0) {
+        const transaction = this.db.transaction(['trees'], 'readwrite');
+        const store = transaction.objectStore('trees');
+        
+        for (const item of trees) {
+          store.put(item.data);
+        }
+        
+        await new Promise<void>((resolve, reject) => {
+          transaction.oncomplete = () => resolve();
+          transaction.onerror = () => reject(transaction.error);
+        });
+      }
+
+      // Batch write nodes
+      if (nodes.length > 0) {
+        const transaction = this.db.transaction(['nodes'], 'readwrite');
+        const store = transaction.objectStore('nodes');
+        
+        for (const item of nodes) {
+          store.put({ ...item.data, treeId: item.treeId });
+        }
+        
+        await new Promise<void>((resolve, reject) => {
+          transaction.oncomplete = () => resolve();
+          transaction.onerror = () => reject(transaction.error);
+        });
+      }
+    } catch (error) {
+      console.error('Error during batch flush:', error);
+      throw error;
+    }
+  }
+
+  // Force immediate flush (useful for critical operations)
+  async flush(): Promise<void> {
+    if (this.flushTimer !== null) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
+    await this.flushWrites();
   }
 }
 

@@ -1,0 +1,47 @@
+---
+description: "Chrome extension development best practices"
+globs: ["extension/**", "*.manifest.json"]
+---
+
+# Chrome Extension Development
+
+## Architecture Patterns
+
+- **Manifest v3**: Required for new extensions
+- **Service Worker**: Background script (no DOM access)
+- **Content Scripts**: Can access page DOM
+- **Popup/Options**: Separate HTML files with their own context
+
+## Storage & State Management
+
+- **chrome.storage.sync**: For user preferences (synced across devices)
+- **chrome.storage.local**: For local data
+- **IndexedDB**: For large datasets (10MB+ limit)
+- Avoid `localStorage` and `sessionStorage` (extension-specific)
+
+## UI Components
+
+- Popup UI: 300-600px wide by default
+- Options page: Full-width responsive
+- Use shadcn/ui components, sized appropriately
+- Tailwind CSS works in content scripts with proper setup
+
+## Permissions & Security
+
+- Request minimum permissions needed
+- Use `content_scripts` with specific URL patterns
+- Avoid eval(), unsafe-inline styles where possible
+- CSP (Content Security Policy) in manifest
+
+## Communication Between Contexts
+
+```typescript
+// From popup/content script to background:
+chrome.runtime.sendMessage({ action: "analyze", data: pageContent });
+
+// From background to content script:
+chrome.tabs.sendMessage(tabId, { action: "highlight", target: "element" });
+
+// From content script to popup:
+chrome.runtime.sendMessage({ action: "update_badge", count: 5 });
+```

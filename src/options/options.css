@@ -4,53 +4,89 @@
   box-sizing: border-box;
 }
 
+:root {
+  /* Backgrounds — warm charcoal tones */
+  --arbor-bg-deep: #141210;
+  --arbor-bg: #1a1815;
+  --arbor-bg-raised: #211e1a;
+  --arbor-bg-elevated: #292520;
+  
+  /* Primary — sage green (nature/growth) */
+  --arbor-primary: #7d9b76;
+  --arbor-primary-soft: rgba(125, 155, 118, 0.12);
+  --arbor-primary-muted: #5a7255;
+  
+  /* Accent — warm amber */
+  --arbor-accent: #c9a66b;
+  --arbor-accent-soft: rgba(201, 166, 107, 0.15);
+  
+  /* Semantic */
+  --arbor-success: #6b9b72;
+  --arbor-warning: #c9a857;
+  --arbor-error: #b86b6b;
+  
+  /* Text — warm tones */
+  --arbor-text-primary: #ebe6df;
+  --arbor-text-secondary: #a39b8f;
+  --arbor-text-tertiary: #726b60;
+  
+  /* Borders */
+  --arbor-border-subtle: #2a2622;
+  --arbor-border-default: #352f29;
+  --arbor-border-strong: #453d35;
+  
+  /* Shadows */
+  --arbor-shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+  --arbor-shadow-md: 0 4px 8px rgba(0,0,0,0.25);
+  --arbor-shadow-lg: 0 8px 24px rgba(0,0,0,0.35);
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--arbor-bg-deep);
   min-height: 100vh;
   padding: 20px;
-  color: #333;
+  color: var(--arbor-text-primary);
 }
 
 .container {
   max-width: 800px;
   margin: 0 auto;
-  background: white;
+  background: var(--arbor-bg-raised);
+  border: 1px solid var(--arbor-border-subtle);
   border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   overflow: hidden;
+  box-shadow: var(--arbor-shadow-lg);
 }
 
 header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: var(--arbor-bg-raised);
+  border-bottom: 1px solid var(--arbor-border-subtle);
+  color: var(--arbor-text-primary);
   padding: 30px;
   text-align: center;
 }
 
 header h1 {
-  font-size: 28px;
+  font-size: 24px;
   margin-bottom: 8px;
   font-weight: 600;
 }
 
 .subtitle {
   font-size: 14px;
-  opacity: 0.9;
+  color: var(--arbor-text-secondary);
 }
 
 /* API Key Missing Banner */
 .api-key-banner {
-  background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
-  border: 2px solid #ffc107;
+  background: var(--arbor-accent-soft);
+  border: 1px solid rgba(201, 166, 107, 0.25);
   border-radius: 8px;
   margin: 20px 30px 24px;
   padding: 0;
-  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
   animation: slideDown 0.3s ease-out;
 }
 
@@ -86,27 +122,27 @@ header h1 {
 
 .banner-text strong {
   display: block;
-  font-size: 18px;
-  color: #856404;
+  font-size: 16px;
+  color: var(--arbor-warning);
   margin-bottom: 8px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .banner-text p {
   font-size: 14px;
-  color: #856404;
+  color: rgba(201, 168, 87, 0.9);
   line-height: 1.6;
   margin: 0;
 }
 
 .banner-text a {
-  color: #856404;
+  color: var(--arbor-warning);
   text-decoration: underline;
   font-weight: 600;
 }
 
 .banner-text a:hover {
-  color: #664d03;
+  color: #d4b06a;
 }
 
 .banner-dismiss {
@@ -116,7 +152,7 @@ header h1 {
   background: transparent;
   border: none;
   font-size: 24px;
-  color: #856404;
+  color: var(--arbor-warning);
   cursor: pointer;
   padding: 4px 8px;
   line-height: 1;
@@ -131,8 +167,7 @@ header h1 {
 }
 
 .banner-dismiss:hover {
-  background: rgba(133, 100, 4, 0.1);
-  color: #664d03;
+  background: var(--arbor-accent-soft);
 }
 
 @media (max-width: 600px) {
@@ -160,6 +195,7 @@ header h1 {
 
 main {
   padding: 30px;
+  background: var(--arbor-bg-raised);
 }
 
 .settings-section {
@@ -167,27 +203,28 @@ main {
 }
 
 .settings-section h2 {
-  font-size: 24px;
+  font-size: 17px;
   margin-bottom: 20px;
-  color: #333;
+  color: var(--arbor-text-primary);
+  font-weight: 500;
 }
 
 .warning-box {
-  background: #fff3cd;
-  border: 1px solid #ffc107;
+  background: var(--arbor-accent-soft);
+  border: 1px solid rgba(201, 166, 107, 0.25);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 24px;
 }
 
 .warning-box strong {
-  color: #856404;
+  color: var(--arbor-warning);
   display: block;
   margin-bottom: 8px;
 }
 
 .warning-box p {
-  color: #856404;
+  color: rgba(201, 168, 87, 0.9);
   font-size: 14px;
   line-height: 1.6;
   margin-bottom: 8px;
@@ -198,7 +235,7 @@ main {
 }
 
 .warning-box a {
-  color: #856404;
+  color: var(--arbor-warning);
   text-decoration: underline;
 }
 
@@ -208,9 +245,9 @@ main {
 
 .form-group label {
   display: block;
-  font-weight: 600;
+  font-weight: 500;
   margin-bottom: 8px;
-  color: #333;
+  color: var(--arbor-text-primary);
 }
 
 .input-wrapper {
@@ -222,16 +259,19 @@ main {
 .input-wrapper input {
   width: 100%;
   padding: 12px 50px 12px 16px;
-  border: 2px solid #e0e0e0;
+  background: var(--arbor-bg);
+  border: 1px solid var(--arbor-border-default);
   border-radius: 8px;
   font-size: 16px;
-  transition: border-color 0.2s;
+  color: var(--arbor-text-primary);
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
   font-family: 'Courier New', monospace;
 }
 
 .input-wrapper input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--arbor-primary);
+  box-shadow: 0 0 0 2px var(--arbor-primary-soft);
 }
 
 .toggle-btn {
@@ -254,11 +294,11 @@ main {
   display: block;
   margin-top: 6px;
   font-size: 13px;
-  color: #666;
+  color: var(--arbor-text-secondary);
 }
 
 .help-text a {
-  color: #667eea;
+  color: var(--arbor-primary);
   text-decoration: none;
 }
 
@@ -279,21 +319,21 @@ main {
 }
 
 .status-message.success {
-  background: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
+  background: var(--arbor-primary-soft);
+  color: var(--arbor-success);
+  border: 1px solid rgba(107, 155, 114, 0.25);
 }
 
 .status-message.error {
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+  background: rgba(184, 107, 107, 0.1);
+  color: var(--arbor-error);
+  border: 1px solid rgba(184, 107, 107, 0.25);
 }
 
 .status-message.info {
-  background: #d1ecf1;
-  color: #0c5460;
-  border: 1px solid #bee5eb;
+  background: var(--arbor-primary-soft);
+  color: var(--arbor-primary);
+  border: 1px solid rgba(125, 155, 118, 0.25);
 }
 
 .form-actions {
@@ -307,7 +347,7 @@ main {
   border: none;
   border-radius: 8px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
   display: inline-flex;
@@ -321,31 +361,32 @@ main {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: var(--arbor-primary);
+  color: #141210;
 }
 
 .btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  background: #8ba884;
 }
 
 .btn-secondary {
-  background: #6c757d;
-  color: white;
+  background: var(--arbor-bg-raised);
+  color: var(--arbor-text-primary);
+  border: 1px solid var(--arbor-border-default);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #5a6268;
+  background: var(--arbor-bg-elevated);
+  border-color: var(--arbor-border-strong);
 }
 
 .btn-danger {
-  background: #dc3545;
-  color: white;
+  background: var(--arbor-error);
+  color: #141210;
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #c82333;
+  background: #c47a7a;
 }
 
 .loading {
@@ -353,17 +394,18 @@ main {
 }
 
 .info-box {
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
+  background: var(--arbor-bg);
+  border: 1px solid var(--arbor-border-subtle);
   border-radius: 8px;
   padding: 20px;
   margin-top: 24px;
 }
 
 .info-box h3 {
-  font-size: 18px;
+  font-size: 16px;
   margin-bottom: 12px;
-  color: #333;
+  color: var(--arbor-text-primary);
+  font-weight: 500;
 }
 
 .info-box ul,
@@ -375,17 +417,17 @@ main {
 .info-box li {
   margin-bottom: 8px;
   line-height: 1.6;
-  color: #555;
+  color: var(--arbor-text-secondary);
 }
 
 .info-box p {
   margin-bottom: 12px;
   line-height: 1.6;
-  color: #555;
+  color: var(--arbor-text-secondary);
 }
 
 .info-box a {
-  color: #667eea;
+  color: var(--arbor-primary);
   text-decoration: none;
 }
 
