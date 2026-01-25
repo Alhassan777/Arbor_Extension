@@ -3,60 +3,13 @@
  */
 
 import type { ConnectionType } from "../../types";
+import {
+  CONNECTION_TYPES,
+  type ConnectionTypeConfig,
+} from "./context/connectionTypes";
 
-export interface ConnectionTypeOption {
-  type: ConnectionType;
-  description: string;
-  emoji: string;
-}
-
-const CONNECTION_TYPES: ConnectionTypeOption[] = [
-  {
-    type: "extends",
-    description: "Let's extend this discussion to related areas.",
-    emoji: "🔗",
-  },
-  {
-    type: "deepens",
-    description: "Let's explore this topic in more depth.",
-    emoji: "🔍",
-  },
-  {
-    type: "explores",
-    description: "Let's explore a related aspect of this.",
-    emoji: "🧭",
-  },
-  {
-    type: "examples",
-    description: "Let's look at specific examples of this.",
-    emoji: "💡",
-  },
-  {
-    type: "applies",
-    description: "Let's discuss how to apply this in practice.",
-    emoji: "⚙️",
-  },
-  {
-    type: "questions",
-    description: "I have some questions about this.",
-    emoji: "❓",
-  },
-  {
-    type: "contrasts",
-    description: "Let's consider an alternative perspective on this.",
-    emoji: "🔄",
-  },
-  {
-    type: "summarizes",
-    description: "Let's summarize and consolidate what we've discussed.",
-    emoji: "📋",
-  },
-  {
-    type: "custom",
-    description: "Custom connection type (enter your own label)",
-    emoji: "✏️",
-  },
-];
+// Re-export for backward compatibility
+export type ConnectionTypeOption = ConnectionTypeConfig;
 
 export interface BranchDialogResult {
   connectionType: ConnectionType;

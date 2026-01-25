@@ -2,13 +2,16 @@
  * LLMServiceFactory - Creates and manages LLM service instances
  */
 
-import { GeminiLLMService } from "./GeminiLLMService";
+import { GeminiLLMService } from "./providers/gemini";
+import { OpenAILLMService } from "./providers/openai";
+import { AnthropicLLMService } from "./providers/anthropic";
 import type { LLMService } from "./LLMService";
+import { getProviderConfig, getProviderModels } from "./providers/config";
 
 // Re-export types for convenience
 export type { LLMService, SummaryOptions } from "./LLMService";
 
-export type LLMProvider = "gemini" | "none";
+export type LLMProvider = "gemini" | "openai" | "anthropic" | "none";
 
 export interface LLMConfig {
   provider: LLMProvider;
@@ -16,7 +19,22 @@ export interface LLMConfig {
     model?: string;
     enabled?: boolean;
   };
+  openai?: {
+    model?: string;
+    enabled?: boolean;
+  };
+  anthropic?: {
+    model?: string;
+    enabled?: boolean;
+  };
 }
+
+// Available models for each provider (from config)
+export const AVAILABLE_MODELS = {
+  gemini: getProviderModels("gemini"),
+  openai: getProviderModels("openai"),
+  anthropic: getProviderModels("anthropic"),
+} as const;
 
 export class LLMServiceFactory {
   /**
@@ -30,7 +48,10 @@ export class LLMServiceFactory {
     switch (config.provider) {
       case "gemini":
         return new GeminiLLMService(config.gemini);
-
+      case "openai":
+        return new OpenAILLMService(config.openai);
+      case "anthropic":
+        return new AnthropicLLMService(config.anthropic);
       default:
         return null;
     }
@@ -38,15 +59,26 @@ export class LLMServiceFactory {
 
   /**
    * Get default configuration
-   * - Gemini service as default (uses Gemini 2.0 Flash-Lite)
-   * - Enabled by default (requires API key from user)
+   * Uses provider config for defaults
    */
   static getDefaultConfig(): LLMConfig {
+    const geminiConfig = getProviderConfig("gemini");
+    const openaiConfig = getProviderConfig("openai");
+    const anthropicConfig = getProviderConfig("anthropic");
+
     return {
       provider: "gemini",
       gemini: {
         enabled: true,
-        model: "gemini-2.0-flash-exp",
+        model: geminiConfig.defaultModel,
+      },
+      openai: {
+        enabled: false,
+        model: openaiConfig.defaultModel,
+      },
+      anthropic: {
+        enabled: false,
+        model: anthropicConfig.defaultModel,
       },
     };
   }

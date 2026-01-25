@@ -1,15 +1,20 @@
 /**
- * GeminiLLMService - Implementation using Google Gemini 2.0 Flash-Lite
- * Uses the Gemini API via background script for secure API key handling
- * Model: gemini-2.0-flash-exp (fast and efficient for summarization)
+ * BaseLLMService - Base class for all LLM service implementations
+ * Contains shared logic for all providers
  */
 
-import type { Message } from "../ContextFormatter";
-import type { LLMService, SummaryOptions } from "./LLMService";
-import type { ConnectionType } from "../../../../types";
-import { logger } from "../../../../utils/logger";
+import type { Message } from "../../ContextFormatter";
+import type { LLMService, SummaryOptions } from "../LLMService";
+import type { ConnectionType } from "../../../../../types";
+import type { LLMProvider } from "../LLMServiceFactory";
+import { logger } from "../../../../../utils/logger";
+import { getProviderConfig } from "./config";
+import {
+  getSuggestableConnectionTypes,
+  isValidConnectionType,
+} from "../../connectionTypes";
 
-interface GeminiLLMConfig {
+export interface BaseLLMConfig {
   model?: string;
   enabled?: boolean;
 }
@@ -25,31 +30,33 @@ function isExtensionContextAvailable(): boolean {
   }
 }
 
-export class GeminiLLMService implements LLMService {
-  private config: GeminiLLMConfig;
-  private defaultModel = "gemini-2.0-flash-exp";
+export abstract class BaseLLMService implements LLMService {
+  protected config: BaseLLMConfig;
+  protected provider: LLMProvider;
+  protected providerConfig: ReturnType<typeof getProviderConfig>;
 
-  constructor(config: GeminiLLMConfig = {}) {
+  constructor(provider: LLMProvider, config: BaseLLMConfig = {}) {
+    this.provider = provider;
+    this.providerConfig = getProviderConfig(provider);
     this.config = {
       enabled: true,
-      model: this.defaultModel,
+      model: this.providerConfig.defaultModel,
       ...config,
     };
   }
 
   async isAvailable(): Promise<boolean> {
     if (!this.config.enabled) {
-      logger.debug("Gemini LLM is disabled in config");
+      logger.debug(`${this.provider} LLM is disabled in config`);
       return false;
     }
 
     if (!isExtensionContextAvailable()) {
-      logger.debug("Extension context not available for Gemini LLM");
+      logger.debug(`Extension context not available for ${this.provider} LLM`);
       return false;
     }
 
     try {
-      // Check if API key is available
       const response = await new Promise<any>((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Error("Availability check timeout"));
@@ -57,7 +64,8 @@ export class GeminiLLMService implements LLMService {
 
         chrome.runtime.sendMessage(
           {
-            action: "gemini-check-availability",
+            action: "check-availability",
+            payload: { provider: this.provider },
           },
           (response) => {
             clearTimeout(timeout);
@@ -71,20 +79,28 @@ export class GeminiLLMService implements LLMService {
       });
 
       if (!response || !response.success) {
-        logger.debug("Gemini LLM availability check failed:", response?.error || "Unknown error");
+        logger.debug(
+          `${this.provider} LLM availability check failed:`,
+          response?.error || "Unknown error"
+        );
         return false;
       }
 
       const isAvailable = response.available === true;
       if (isAvailable) {
-        logger.debug("Gemini LLM is available");
+        logger.debug(`${this.provider} LLM is available`);
       } else {
-        logger.debug("Gemini LLM is not available (API key missing or invalid)");
+        logger.debug(
+          `${this.provider} LLM is not available (API key missing or invalid)`
+        );
       }
 
       return isAvailable;
     } catch (error) {
-      logger.debug("Gemini LLM availability check failed:", error instanceof Error ? error.message : String(error));
+      logger.debug(
+        `${this.provider} LLM availability check failed:`,
+        error instanceof Error ? error.message : String(error)
+      );
       return false;
     }
   }
@@ -95,13 +111,10 @@ export class GeminiLLMService implements LLMService {
   ): Promise<string> {
     const { maxLength = 200, style = "brief", customPrompt } = options;
 
-    // Format conversation for summarization
     const conversationText = this.formatConversation(messages);
 
-    // Build prompt - use custom prompt if provided, otherwise build based on style
     let prompt: string;
     if (customPrompt) {
-      // Use custom prompt and append conversation
       prompt = `${customPrompt}\n\n${conversationText}`;
     } else if (style === "detailed") {
       prompt = `Summarize the following conversation in detail, capturing key points, decisions, and context. Keep it concise but comprehensive (around ${maxLength} words):\n\n${conversationText}`;
@@ -118,22 +131,23 @@ export class GeminiLLMService implements LLMService {
         );
       }
 
-      logger.debug(`Requesting summarization from Gemini LLM (model: ${this.config.model})`);
+      logger.debug(
+        `Requesting summarization from ${this.provider} LLM (model: ${this.config.model})`
+      );
 
-      // Call summarization via background script
       const response = await new Promise<any>((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Error("Request timeout"));
-        }, 30000); // 30 second timeout for API calls
+        }, 30000);
 
         chrome.runtime.sendMessage(
           {
-            action: "gemini-api-call",
+            action: "llm-api-call",
             payload: {
-              method: "generateContent",
+              provider: this.provider,
               model: this.config.model,
               prompt: prompt,
-              maxTokens: Math.floor(maxLength * 1.5), // Approximate token count
+              maxTokens: Math.floor(maxLength * 1.5),
             },
           },
           (response) => {
@@ -160,7 +174,7 @@ export class GeminiLLMService implements LLMService {
         throw new Error(errorMsg);
       }
 
-      logger.debug("Gemini LLM summarization completed");
+      logger.debug(`${this.provider} LLM summarization completed`);
       return response.text?.trim() || "";
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -187,9 +201,9 @@ export class GeminiLLMService implements LLMService {
 
         chrome.runtime.sendMessage(
           {
-            action: "gemini-api-call",
+            action: "llm-api-call",
             payload: {
-              method: "generateContent",
+              provider: this.provider,
               model: this.config.model,
               prompt: prompt,
               maxTokens: 300,
@@ -218,7 +232,6 @@ export class GeminiLLMService implements LLMService {
         throw new Error(response.error || "Key extraction failed");
       }
 
-      // Parse bullet points from response
       const text = response.text?.trim() || "";
       const points = text
         .split(/\n+/)
@@ -235,24 +248,15 @@ export class GeminiLLMService implements LLMService {
 
   async suggestConnectionType(messages: Message[]): Promise<ConnectionType> {
     const conversationText = this.formatConversation(messages);
-    const connectionTypes: ConnectionType[] = [
-      "extends",
-      "deepens",
-      "explores",
-      "examples",
-      "applies",
-      "questions",
-      "contrasts",
-      "summarizes",
-    ];
+    const suggestableTypes = getSuggestableConnectionTypes();
+    const typeList = suggestableTypes.join(", ");
 
     try {
       if (!isExtensionContextAvailable()) {
-        // Fallback to heuristic if extension context unavailable
         return this.heuristicConnectionType(conversationText);
       }
 
-      const prompt = `Based on this conversation, suggest the most appropriate connection type for continuing the discussion. Choose ONE from: extends, deepens, explores, examples, applies, questions, contrasts, summarizes.
+      const prompt = `Based on this conversation, suggest the most appropriate connection type for continuing the discussion. Choose ONE from: ${typeList}.
 
 Return ONLY the connection type word, nothing else.
 
@@ -266,9 +270,9 @@ ${conversationText}`;
 
         chrome.runtime.sendMessage(
           {
-            action: "gemini-api-call",
+            action: "llm-api-call",
             payload: {
-              method: "generateContent",
+              provider: this.provider,
               model: this.config.model,
               prompt: prompt,
               maxTokens: 10,
@@ -298,21 +302,20 @@ ${conversationText}`;
       }
 
       const suggestedType = response.text?.trim().toLowerCase() || "";
-      const validType = connectionTypes.find(
-        (type) => type === suggestedType
-      );
+      
+      // Validate the suggested type is a valid, suggestable connection type
+      if (isValidConnectionType(suggestedType) && suggestableTypes.includes(suggestedType)) {
+        return suggestedType;
+      }
 
-      return validType || this.heuristicConnectionType(conversationText);
+      // Fallback to heuristic if LLM returned invalid type
+      return this.heuristicConnectionType(conversationText);
     } catch (error) {
-      // Fallback to heuristic on error
       return this.heuristicConnectionType(conversationText);
     }
   }
 
-  /**
-   * Heuristic-based connection type suggestion (fallback)
-   */
-  private heuristicConnectionType(conversationText: string): ConnectionType {
+  protected heuristicConnectionType(conversationText: string): ConnectionType {
     const text = conversationText.toLowerCase();
     if (text.includes("example") || text.includes("instance")) {
       return "examples";
@@ -338,7 +341,7 @@ ${conversationText}`;
     return "extends";
   }
 
-  private formatConversation(messages: Message[]): string {
+  protected formatConversation(messages: Message[]): string {
     return messages
       .map((msg) => {
         const role = msg.role === "user" ? "User" : "Assistant";
@@ -347,17 +350,11 @@ ${conversationText}`;
       .join("\n\n");
   }
 
-  /**
-   * Update configuration
-   */
-  updateConfig(config: Partial<GeminiLLMConfig>): void {
+  updateConfig(config: Partial<BaseLLMConfig>): void {
     this.config = { ...this.config, ...config };
   }
 
-  /**
-   * Get current configuration
-   */
-  getConfig(): GeminiLLMConfig {
+  getConfig(): BaseLLMConfig {
     return { ...this.config };
   }
 }

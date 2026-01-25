@@ -10,7 +10,7 @@
   <div class="container">
     <header>
       <h1>Arbor Extension Settings</h1>
-      <p class="subtitle">Configure your Gemini API key for intelligent summarization with ChatGPT conversations</p>
+      <p class="subtitle">Configure your AI model provider and API keys for intelligent summarization</p>
     </header>
 
     <main>
@@ -19,77 +19,83 @@
         <div class="banner-content">
           <div class="banner-text">
             <strong>API Key Required</strong>
-            <p>To use Arbor's intelligent features, please add your Gemini API key below. Get your free API key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.</p>
+            <p>To use Arbor's intelligent features, please select a provider and add your API key below.</p>
           </div>
           <button id="dismissBanner" class="banner-dismiss" aria-label="Dismiss">×</button>
         </div>
       </div>
 
       <section class="settings-section">
-        <h2>Connect Gemini</h2>
+        <h2>Model Configuration</h2>
         
         <div class="warning-box">
           <strong>Security Notice</strong>
-          <p>Your API key is stored securely on your device only (using Chrome's encrypted storage). It will never be synced or sent to any server except Google's Gemini API.</p>
-          <p><strong>Important:</strong> Never share your API key. If you suspect it has been compromised, revoke it immediately in <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.</p>
+          <p>Your API keys are stored securely on your device only (using Chrome's encrypted storage). They will never be synced or sent to any server except the selected provider's API.</p>
+          <p><strong>Important:</strong> Never share your API keys. If you suspect they have been compromised, revoke them immediately in your provider's dashboard.</p>
         </div>
 
-        <form id="apiKeyForm">
+        <form id="configForm">
           <div class="form-group">
-            <label for="apiKey">Gemini API Key</label>
-            <div class="input-wrapper">
-              <input 
-                type="password" 
-                id="apiKey" 
-                name="apiKey" 
-                placeholder="AIza..."
-                autocomplete="off"
-                required
-              />
-              <button type="button" id="toggleVisibility" class="toggle-btn" aria-label="Toggle visibility">
-                👁
-              </button>
-            </div>
-            <small class="help-text">
-              Get your API key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>
-            </small>
+            <label for="provider">AI Provider</label>
+            <select id="provider" name="provider" required>
+              <option value="gemini">Google Gemini</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="none">None (Disable AI features)</option>
+            </select>
+            <small class="help-text">Select the AI provider you want to use for summarization</small>
           </div>
 
-          <div id="statusMessage" class="status-message" role="alert"></div>
+          <div class="form-group" id="modelGroup" style="display: none;">
+            <label for="model">Model</label>
+            <select id="model" name="model">
+              <!-- Options will be populated dynamically based on provider -->
+            </select>
+            <small class="help-text">Select the specific model to use</small>
+          </div>
 
-          <div class="form-actions">
-            <button type="submit" id="saveBtn" class="btn btn-primary">
-              <span id="saveBtnText">Save API Key</span>
-              <span id="saveBtnLoading" class="loading" style="display: none;">⏳ Validating...</span>
-            </button>
-            <button type="button" id="testBtn" class="btn btn-secondary">
-              Test Connection
-            </button>
-            <button type="button" id="removeBtn" class="btn btn-danger">
-              Remove Key
-            </button>
+          <div id="apiKeySection" style="display: none;">
+            <div class="form-group">
+              <label id="apiKeyLabel" for="apiKey">API Key</label>
+              <div class="input-wrapper">
+                <input 
+                  type="password" 
+                  id="apiKey" 
+                  name="apiKey" 
+                  placeholder="Enter your API key..."
+                  autocomplete="off"
+                />
+                <button type="button" id="toggleVisibility" class="toggle-btn" aria-label="Toggle visibility">
+                  👁
+                </button>
+              </div>
+              <small class="help-text" id="apiKeyHelp">
+                <!-- Help text will be populated dynamically -->
+              </small>
+            </div>
+
+            <div id="statusMessage" class="status-message" role="alert"></div>
+
+            <div class="form-actions">
+              <button type="submit" id="saveBtn" class="btn btn-primary">
+                <span id="saveBtnText">Save Configuration</span>
+                <span id="saveBtnLoading" class="loading" style="display: none;">⏳ Validating...</span>
+              </button>
+              <button type="button" id="testBtn" class="btn btn-secondary">
+                Test Connection
+              </button>
+              <button type="button" id="removeBtn" class="btn btn-danger">
+                Remove Key
+              </button>
+            </div>
           </div>
         </form>
 
-        <div class="info-box">
+        <div class="info-box" id="providerInfo">
           <h3>How it works</h3>
-          <ul>
-            <li><strong>Get your API key:</strong> Visit <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a> to create a free API key</li>
-            <li><strong>Secure storage:</strong> Your key is encrypted and stored locally on your device</li>
-            <li><strong>Direct connection:</strong> The extension connects directly to Google's Gemini API</li>
-            <li><strong>Key restrictions:</strong> You can restrict your API key to specific domains in <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a></li>
+          <ul id="providerInfoList">
+            <!-- Info will be populated dynamically -->
           </ul>
-        </div>
-
-        <div class="info-box">
-          <h3>Key Rotation</h3>
-          <p>If you need to rotate or revoke your API key:</p>
-          <ol>
-            <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a></li>
-            <li>Revoke the old key if compromised</li>
-            <li>Create a new key</li>
-            <li>Update it here in the extension settings</li>
-          </ol>
         </div>
       </section>
     </main>

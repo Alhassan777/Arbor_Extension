@@ -1,7 +1,7 @@
 /**
- * Secure API Key Storage Utility
+ * API Key Storage Utility
  * 
- * Stores Gemini API keys securely using chrome.storage.local
+ * Stores API keys for multiple LLM providers securely using chrome.storage.local
  * - Keys are encrypted using Web Crypto API (AES-GCM) before storage
  * - Encryption key is derived from extension ID
  * - Keys are never logged in full - always redacted for security
@@ -9,21 +9,25 @@
 
 import { logger } from "../utils/logger";
 
-const STORAGE_KEY = "gemini_api_key";
+const STORAGE_KEY_PREFIX = "llm_api_key_";
 const ENCRYPTION_MARKER = "__encrypted__";
-const ENCRYPTION_KEY_NAME = "arbor_encryption_key";
 
 // Web Crypto API algorithm
 const ENCRYPTION_ALGORITHM = "AES-GCM";
 const KEY_LENGTH = 256;
 
+export type ProviderType = "gemini" | "openai" | "anthropic";
+
 /**
- * Redact API key for safe logging (only shows first 7 chars: "AIza...")
+ * Redact API key for safe logging
  */
-function redactApiKey(key: string | null | undefined): string {
+function redactApiKey(key: string | null | undefined, provider: ProviderType): string {
   if (!key) return "[no key]";
   if (key.length <= 10) return "[invalid]";
-  return `${key.substring(0, 7)}...****`;
+  
+  // Different providers have different prefixes
+  const prefixLength = provider === "gemini" ? 7 : provider === "openai" ? 7 : 8;
+  return `${key.substring(0, prefixLength)}...****`;
 }
 
 /**
@@ -33,12 +37,9 @@ const MASTER_KEY_STORAGE = "arbor_master_encryption_key";
 
 /**
  * Generate or retrieve unique per-installation encryption key
- * This ensures each extension installation has a truly unique, random key
- * SECURITY: This provides better security than deriving from extension ID (which is public)
  */
 async function getMasterEncryptionKey(): Promise<CryptoKey> {
   try {
-    // Try to retrieve existing key
     const stored = await new Promise<any>((resolve) => {
       chrome.storage.local.get([MASTER_KEY_STORAGE], (result) => {
         resolve(result[MASTER_KEY_STORAGE]);
@@ -46,7 +47,6 @@ async function getMasterEncryptionKey(): Promise<CryptoKey> {
     });
 
     if (stored?.keyData) {
-      // Import existing key from storage
       const keyBytes = Uint8Array.from(atob(stored.keyData), c => c.charCodeAt(0));
       return await crypto.subtle.importKey(
         "raw",
@@ -57,14 +57,12 @@ async function getMasterEncryptionKey(): Promise<CryptoKey> {
       );
     }
 
-    // Generate new random key (first-time installation)
     const key = await crypto.subtle.generateKey(
       { name: ENCRYPTION_ALGORITHM, length: KEY_LENGTH },
-      true, // extractable (so we can store it)
+      true,
       ["encrypt", "decrypt"]
     );
 
-    // Export and store the key for future use
     const exported = await crypto.subtle.exportKey("raw", key);
     const keyData = btoa(String.fromCharCode(...new Uint8Array(exported)));
     
@@ -81,23 +79,12 @@ async function getMasterEncryptionKey(): Promise<CryptoKey> {
 }
 
 /**
- * Get encryption key (wrapper for backward compatibility)
- */
-async function deriveEncryptionKey(): Promise<CryptoKey> {
-  return await getMasterEncryptionKey();
-}
-
-/**
  * Encrypt API key using AES-GCM
  */
 async function encryptApiKey(apiKey: string): Promise<{ encrypted: string; iv: string }> {
   try {
-    const key = await deriveEncryptionKey();
-    
-    // Generate random IV
+    const key = await getMasterEncryptionKey();
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    
-    // Encrypt the API key
     const encrypted = await crypto.subtle.encrypt(
       {
         name: ENCRYPTION_ALGORITHM,
@@ -107,7 +94,6 @@ async function encryptApiKey(apiKey: string): Promise<{ encrypted: string; iv: s
       new TextEncoder().encode(apiKey)
     );
     
-    // Convert to base64 for storage
     const encryptedBase64 = btoa(String.fromCharCode(...new Uint8Array(encrypted)));
     const ivBase64 = btoa(String.fromCharCode(...iv));
     
@@ -125,13 +111,10 @@ async function encryptApiKey(apiKey: string): Promise<{ encrypted: string; iv: s
  */
 async function decryptApiKey(encryptedData: string, ivData: string): Promise<string> {
   try {
-    const key = await deriveEncryptionKey();
-    
-    // Convert from base64
+    const key = await getMasterEncryptionKey();
     const encrypted = Uint8Array.from(atob(encryptedData), c => c.charCodeAt(0));
     const iv = Uint8Array.from(atob(ivData), c => c.charCodeAt(0));
     
-    // Decrypt
     const decrypted = await crypto.subtle.decrypt(
       {
         name: ENCRYPTION_ALGORITHM,
@@ -160,31 +143,45 @@ function isEncrypted(value: any): boolean {
 }
 
 /**
- * Validate API key format
- * Gemini API keys start with "AIza" and are typically 39+ characters
- * SECURITY: Enhanced with length limits and character validation to prevent DoS/injection attacks
+ * Get storage key for a provider
  */
-export function validateApiKeyFormat(key: string): { valid: boolean; error?: string } {
+function getStorageKey(provider: ProviderType): string {
+  return `${STORAGE_KEY_PREFIX}${provider}`;
+}
+
+/**
+ * Validate API key format for a provider
+ */
+export function validateApiKeyFormat(key: string, provider: ProviderType): { valid: boolean; error?: string } {
   if (!key || typeof key !== "string") {
     return { valid: false, error: "API key is required" };
   }
 
   const trimmed = key.trim();
 
-  // Maximum length check to prevent DoS attacks
   if (trimmed.length > 200) {
     return { valid: false, error: "API key is too long (maximum 200 characters)" };
   }
 
-  if (trimmed.length < 30) {
-    return { valid: false, error: "API key is too short (minimum 30 characters)" };
+  if (trimmed.length < 20) {
+    return { valid: false, error: "API key is too short (minimum 20 characters)" };
   }
 
-  if (!trimmed.startsWith("AIza")) {
-    return { valid: false, error: "Invalid API key format (must start with 'AIza')" };
+  // Provider-specific validation
+  if (provider === "gemini") {
+    if (!trimmed.startsWith("AIza")) {
+      return { valid: false, error: "Invalid Gemini API key format (must start with 'AIza')" };
+    }
+  } else if (provider === "openai") {
+    if (!trimmed.startsWith("sk-")) {
+      return { valid: false, error: "Invalid OpenAI API key format (must start with 'sk-')" };
+    }
+  } else if (provider === "anthropic") {
+    if (!trimmed.startsWith("sk-ant-")) {
+      return { valid: false, error: "Invalid Anthropic API key format (must start with 'sk-ant-')" };
+    }
   }
   
-  // Only allow alphanumeric characters, hyphens, and underscores (common in API keys)
   if (!/^[A-Za-z0-9_-]+$/.test(trimmed)) {
     return { valid: false, error: "API key contains invalid characters (only alphanumeric, hyphens, and underscores allowed)" };
   }
@@ -193,80 +190,53 @@ export function validateApiKeyFormat(key: string): { valid: boolean; error?: str
 }
 
 /**
- * Get the stored API key (decrypts if encrypted)
- * @returns Promise resolving to API key string or null if not set
+ * Get the stored API key for a provider (decrypts if encrypted)
  */
-export async function getApiKey(): Promise<string | null> {
+export async function getApiKey(provider: ProviderType): Promise<string | null> {
   try {
     return new Promise(async (resolve, reject) => {
-      chrome.storage.local.get([STORAGE_KEY], async (result) => {
+      const storageKey = getStorageKey(provider);
+      chrome.storage.local.get([storageKey], async (result) => {
         if (chrome.runtime.lastError) {
-          logger.error("Error getting API key:", chrome.runtime.lastError.message);
+          logger.error(`Error getting ${provider} API key:`, chrome.runtime.lastError.message);
           reject(new Error(chrome.runtime.lastError.message));
           return;
         }
 
-        const stored = result[STORAGE_KEY];
+        const stored = result[storageKey];
         
         if (!stored) {
-          logger.debug("No API key found in storage");
+          logger.debug(`No ${provider} API key found in storage`);
           resolve(null);
           return;
         }
 
         try {
-          let apiKey: string;
-          
-          // Check if encrypted (new format)
           if (isEncrypted(stored)) {
-            apiKey = await decryptApiKey(stored.encrypted, stored.iv);
-          } else if (typeof stored === "string") {
-            // Legacy unencrypted format - migrate it
-            logger.debug("Migrating unencrypted API key to encrypted format");
-            apiKey = stored;
-            
-            // Re-encrypt and save
-            try {
-              const encrypted = await encryptApiKey(apiKey);
-              chrome.storage.local.set({
-                [STORAGE_KEY]: {
-                  marker: ENCRYPTION_MARKER,
-                  encrypted: encrypted.encrypted,
-                  iv: encrypted.iv,
-                }
-              });
-            } catch (migrationError) {
-              logger.warn("Failed to migrate API key to encrypted format", migrationError);
-              // Continue with unencrypted key if migration fails
-            }
+            const apiKey = await decryptApiKey(stored.encrypted, stored.iv);
+            logger.debug(`${provider} API key retrieved from storage`);
+            resolve(apiKey);
           } else {
-            logger.error("Invalid API key format in storage");
+            logger.error(`Invalid ${provider} API key format in storage`);
             resolve(null);
-            return;
           }
-
-          logger.debug("API key retrieved from storage");
-          resolve(apiKey);
         } catch (decryptError) {
-          logger.error("Failed to decrypt API key", decryptError);
-          reject(new Error("Failed to decrypt stored API key. Please re-enter your API key."));
+          logger.error(`Failed to decrypt ${provider} API key`, decryptError);
+          reject(new Error(`Failed to decrypt stored ${provider} API key. Please re-enter your API key.`));
         }
       });
     });
   } catch (error) {
-    logger.error("Failed to get API key:", error);
+    logger.error(`Failed to get ${provider} API key:`, error);
     return null;
   }
 }
 
 /**
- * Store an API key securely (encrypts before storage)
- * @param apiKey - The API key to store
- * @returns Promise resolving to success status
+ * Store an API key securely for a provider (encrypts before storage)
  */
-export async function setApiKey(apiKey: string): Promise<{ success: boolean; error?: string }> {
-  // Validate format before storing
-  const validation = validateApiKeyFormat(apiKey);
+export async function setApiKey(apiKey: string, provider: ProviderType): Promise<{ success: boolean; error?: string }> {
+  const validation = validateApiKeyFormat(apiKey, provider);
   if (!validation.valid) {
     return { success: false, error: validation.error };
   }
@@ -274,8 +244,8 @@ export async function setApiKey(apiKey: string): Promise<{ success: boolean; err
   const trimmed = apiKey.trim();
 
   try {
-    // Encrypt the API key before storage
     const encrypted = await encryptApiKey(trimmed);
+    const storageKey = getStorageKey(provider);
     
     const storageValue = {
       marker: ENCRYPTION_MARKER,
@@ -284,56 +254,62 @@ export async function setApiKey(apiKey: string): Promise<{ success: boolean; err
     };
 
     return new Promise((resolve, reject) => {
-      chrome.storage.local.set({ [STORAGE_KEY]: storageValue }, () => {
+      chrome.storage.local.set({ [storageKey]: storageValue }, () => {
         if (chrome.runtime.lastError) {
           const error = chrome.runtime.lastError.message;
-          logger.error("Error saving API key:", error);
+          logger.error(`Error saving ${provider} API key:`, error);
           reject(new Error(error));
           return;
         }
 
-        logger.debug("API key encrypted and saved to secure storage");
+        logger.debug(`${provider} API key encrypted and saved to secure storage`);
         resolve({ success: true });
       });
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    logger.error("Failed to save API key:", errorMessage);
+    logger.error(`Failed to save ${provider} API key:`, errorMessage);
     return { success: false, error: errorMessage };
   }
 }
 
 /**
- * Remove the stored API key
- * @returns Promise resolving to success status
+ * Remove the stored API key for a provider
  */
-export async function removeApiKey(): Promise<{ success: boolean; error?: string }> {
+export async function removeApiKey(provider: ProviderType): Promise<{ success: boolean; error?: string }> {
   try {
+    const storageKey = getStorageKey(provider);
     return new Promise((resolve, reject) => {
-      chrome.storage.local.remove([STORAGE_KEY], () => {
+      chrome.storage.local.remove([storageKey], () => {
         if (chrome.runtime.lastError) {
           const error = chrome.runtime.lastError.message;
-          logger.error("Error removing API key:", error);
+          logger.error(`Error removing ${provider} API key:`, error);
           reject(new Error(error));
           return;
         }
 
-        logger.debug("API key removed from storage");
+        logger.debug(`${provider} API key removed from storage`);
         resolve({ success: true });
       });
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    logger.error("Failed to remove API key:", errorMessage);
+    logger.error(`Failed to remove ${provider} API key:`, errorMessage);
     return { success: false, error: errorMessage };
   }
 }
 
 /**
- * Check if an API key is currently stored
- * @returns Promise resolving to boolean
+ * Check if an API key is currently stored for a provider
  */
-export async function hasApiKey(): Promise<boolean> {
-  const key = await getApiKey();
+export async function hasApiKey(provider: ProviderType): Promise<boolean> {
+  const key = await getApiKey(provider);
   return key !== null && key.length > 0;
+}
+
+/**
+ * Get redacted API key for display
+ */
+export function redactApiKeyForDisplay(key: string | null | undefined, provider: ProviderType): string {
+  return redactApiKey(key, provider);
 }

@@ -4,55 +4,18 @@
  */
 
 import type { ConnectionType } from "../../types";
+import {
+  CONNECTION_TYPES,
+  type ConnectionTypeConfig,
+} from "./context/connectionTypes";
 
-export interface ConnectionTypeOption {
-  type: ConnectionType;
-  description: string;
-  emoji: string;
-}
+// Re-export for backward compatibility
+export type ConnectionTypeOption = ConnectionTypeConfig;
 
-const CONNECTION_TYPES: ConnectionTypeOption[] = [
-  {
-    type: "extends",
-    description: "Extends to related areas",
-    emoji: "🔗",
-  },
-  {
-    type: "deepens",
-    description: "Explores topic in more depth",
-    emoji: "🔍",
-  },
-  {
-    type: "explores",
-    description: "Explores a related aspect",
-    emoji: "🧭",
-  },
-  {
-    type: "examples",
-    description: "Looks at specific examples",
-    emoji: "💡",
-  },
-  {
-    type: "applies",
-    description: "Applies in practice",
-    emoji: "⚙️",
-  },
-  {
-    type: "questions",
-    description: "Asks questions about this",
-    emoji: "❓",
-  },
-  {
-    type: "contrasts",
-    description: "Considers alternative perspective",
-    emoji: "🔄",
-  },
-  {
-    type: "summarizes",
-    description: "Summarizes and consolidates",
-    emoji: "📋",
-  },
-];
+// Filter out "custom" for this dialog (only used for editing existing labels)
+const CONNECTION_TYPES_FOR_LABEL = CONNECTION_TYPES.filter(
+  (ct) => ct.type !== "custom"
+);
 
 export interface ConnectionLabelDialogOptions {
   parentTitle: string;
@@ -81,7 +44,7 @@ export class ConnectionLabelDialog {
       const selectedType: { value: ConnectionType | string } = {
         value: currentLabel || "extends",
       };
-      const isCustom = currentLabel && !CONNECTION_TYPES.find(t => t.type === currentLabel);
+      const isCustom = currentLabel && !CONNECTION_TYPES_FOR_LABEL.find(t => t.type === currentLabel);
       
       // Escape HTML for safe rendering
       const escapedParentTitle = ConnectionLabelDialog.escapeHtml(parentTitle);
@@ -112,7 +75,7 @@ export class ConnectionLabelDialog {
             </p>
 
             <div class="arbor-modal-scroll">
-              ${CONNECTION_TYPES.map(
+              ${CONNECTION_TYPES_FOR_LABEL.map(
                 (option) => {
                   const isSelected = !isCustom && option.type === (currentLabel || "extends");
                   return `
