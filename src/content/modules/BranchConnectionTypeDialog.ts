@@ -49,7 +49,7 @@ export class BranchConnectionTypeDialog {
           right: 0;
           bottom: 0;
           background: rgba(0,0,0,0.8);
-          z-index: 99999999;
+          z-index: 2147483647;
           display: flex;
           align-items: center;
           justify-content: center;

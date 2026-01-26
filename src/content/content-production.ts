@@ -30,6 +30,7 @@ import {
 } from "../utils/sessionStorage";
 import type { ExtensionState, ChatTree, ConnectionType } from "../types";
 import type { AvailableChat } from "./modules/ChatDetector";
+import { BranchContextManager } from "./modules/BranchContextManager";
 
 class ArborExtension {
   private state: ExtensionState = {
@@ -172,8 +173,6 @@ class ArborExtension {
 
   private async getBranchContextManager(): Promise<any> {
     if (!this.branchContextManager) {
-      const { BranchContextManager } =
-        await import("./modules/BranchContextManager");
       this.branchContextManager = new BranchContextManager(this.platform);
     }
     return this.branchContextManager;
@@ -1150,7 +1149,6 @@ class ArborExtension {
         setTimeout(async () => {
           const pasted = await platformAdapter.pasteIntoInput(context);
           if (pasted) {
-            console.log("🌳 Arbor: Context pasted successfully");
             this.showNotification(
               "Context added! The AI now has your conversation history. Continue chatting →",
               "success",
@@ -1223,7 +1221,6 @@ class ArborExtension {
 
       if (existingNode) {
         // Chat is already in the tree
-        console.log("🌳 Arbor: Chat already in tree");
         this.clearBranchContext();
         return;
       }
@@ -1547,7 +1544,6 @@ class ArborExtension {
       platformAdapter.cleanup();
     }
 
-    console.log("🌳 Arbor: Cleanup complete");
   }
 }
 

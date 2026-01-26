@@ -90,9 +90,6 @@ export class SummaryFormatter implements ContextFormatter {
         estimatedTokens,
       };
 
-      console.warn(
-        `🌳 Arbor: Auto-limited from ${initialCount} to ${messagesToSend.length} messages (${estimatedTokens} tokens)`
-      );
     } else if (
       messageCount > originalCount &&
       originalCount < validMessages.length
@@ -114,7 +111,6 @@ export class SummaryFormatter implements ContextFormatter {
     // (in case it was initialized after this formatter was created)
     let summary: string;
     let llmService: LLMService | null = this.llmService;
-    let summaryMode = "text-based"; // Track which mode was actually used
 
     // If we don't have an LLM service, try to get it dynamically
     if (!llmService) {
@@ -128,11 +124,8 @@ export class SummaryFormatter implements ContextFormatter {
     if (llmService) {
       try {
         const isAvailable = await llmService.isAvailable();
+        
         if (isAvailable) {
-          const serviceType = llmService.constructor.name;
-          console.log(`🌳 Arbor: LLM service available (${serviceType}), generating AI summary...`);
-          console.log(`🌳 Arbor: Summarizing ${messagesToSend.length} messages`);
-          
           // Use custom prompt if provided, otherwise use default
           const summaryOptions: any = {
             maxLength: 400,
@@ -144,27 +137,17 @@ export class SummaryFormatter implements ContextFormatter {
           }
           
           summary = await llmService.summarize(messagesToSend, summaryOptions);
-          
-          summaryMode = serviceType;
-          console.log(`🌳 Arbor: ✅ AI summary generated using ${serviceType}`);
-          console.log(`🌳 Arbor: Summary length: ${summary.length} characters`);
         } else {
-          console.log("🌳 Arbor: LLM service not available, using text-based summary");
           summary = MessageProcessor.generateBriefSummary(validMessages, 400);
         }
       } catch (error) {
         // Fallback to text-based summary on any error
-        console.warn("🌳 Arbor: LLM summarization failed, falling back to text-based:", error);
         summary = MessageProcessor.generateBriefSummary(validMessages, 400);
       }
     } else {
       // Use traditional text-based summary
-      console.log("🌳 Arbor: No LLM service configured, using text-based summary");
       summary = MessageProcessor.generateBriefSummary(validMessages, 400);
     }
-
-    // Log final summary mode
-    console.log(`🌳 Arbor: 📝 Final summary mode: ${summaryMode}`);
 
     // Build context
     let context = `This is a continuation of our previous conversation: "${parentTitle}".\n\n`;

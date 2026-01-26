@@ -47,12 +47,10 @@ export abstract class BaseLLMService implements LLMService {
 
   async isAvailable(): Promise<boolean> {
     if (!this.config.enabled) {
-      logger.debug(`${this.provider} LLM is disabled in config`);
       return false;
     }
 
     if (!isExtensionContextAvailable()) {
-      logger.debug(`Extension context not available for ${this.provider} LLM`);
       return false;
     }
 
@@ -79,28 +77,11 @@ export abstract class BaseLLMService implements LLMService {
       });
 
       if (!response || !response.success) {
-        logger.debug(
-          `${this.provider} LLM availability check failed:`,
-          response?.error || "Unknown error"
-        );
         return false;
       }
 
-      const isAvailable = response.available === true;
-      if (isAvailable) {
-        logger.debug(`${this.provider} LLM is available`);
-      } else {
-        logger.debug(
-          `${this.provider} LLM is not available (API key missing or invalid)`
-        );
-      }
-
-      return isAvailable;
+      return response.available === true;
     } catch (error) {
-      logger.debug(
-        `${this.provider} LLM availability check failed:`,
-        error instanceof Error ? error.message : String(error)
-      );
       return false;
     }
   }
@@ -131,9 +112,6 @@ export abstract class BaseLLMService implements LLMService {
         );
       }
 
-      logger.debug(
-        `Requesting summarization from ${this.provider} LLM (model: ${this.config.model})`
-      );
 
       const response = await new Promise<any>((resolve, reject) => {
         const timeout = setTimeout(() => {
@@ -147,7 +125,7 @@ export abstract class BaseLLMService implements LLMService {
               provider: this.provider,
               model: this.config.model,
               prompt: prompt,
-              maxTokens: Math.floor(maxLength * 1.5),
+              maxTokens: Math.max(1000, Math.floor(maxLength * 2.5)), // At least 1000 tokens, or 2.5x word count
             },
           },
           (response) => {
@@ -174,7 +152,6 @@ export abstract class BaseLLMService implements LLMService {
         throw new Error(errorMsg);
       }
 
-      logger.debug(`${this.provider} LLM summarization completed`);
       return response.text?.trim() || "";
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

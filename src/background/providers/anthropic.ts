@@ -30,7 +30,6 @@ export class AnthropicProvider extends BaseProvider {
       max_tokens: maxTokens,
     };
 
-    logger.debug(`Calling Anthropic API (model: ${model})`);
 
     let response: Response;
     try {

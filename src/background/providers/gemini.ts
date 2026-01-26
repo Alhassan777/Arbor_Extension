@@ -35,7 +35,6 @@ export class GeminiProvider extends BaseProvider {
       },
     };
 
-    logger.debug(`Calling Gemini API (model: ${model})`);
 
     let response: Response;
     try {
@@ -60,8 +59,10 @@ export class GeminiProvider extends BaseProvider {
     // Extract text from Gemini response
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) {
+      logger.error("No text in Gemini API response. Response:", data);
       throw new Error("No text in Gemini API response");
     }
+
 
     return { text };
   }

@@ -1699,56 +1699,100 @@ export class StyleInjector {
         z-index: 100;
       }
 
-      /* Floating Toggle Buttons — 8px radius, green active state */
+      /* Floating Toggle Buttons — Enhanced visual distinction */
       /* Side Toggle Buttons */
       .arbor-side-toggle-btn {
         position: fixed;
         top: 50%;
         transform: translateY(-50%);
-        padding: 12px 16px;
-        background: rgba(26, 24, 21, 0.95);
-        backdrop-filter: blur(10px);
-        border: 1px solid var(--arbor-border-default);
+        padding: 14px 18px;
+        background: var(--arbor-bg-raised);
+        backdrop-filter: blur(12px);
+        border: 2px solid var(--arbor-border-default);
         color: var(--arbor-text-primary);
         font-size: 13px;
-        font-weight: 500;
+        font-weight: 600;
         cursor: pointer;
-        transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+        transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
         display: flex;
         align-items: center;
-        gap: 8px;
-        box-shadow: var(--arbor-shadow-md);
+        gap: 10px;
+        box-shadow: var(--arbor-shadow-lg), 0 0 0 0 rgba(125, 155, 118, 0);
         z-index: 1000000;
         writing-mode: vertical-rl;
         text-orientation: mixed;
+        min-width: 48px;
+        min-height: 120px;
       }
       
       #toggle-sidebar-btn {
         left: 0;
-        border-left: none;
-        border-radius: 0 8px 8px 0;
+        border-left: 3px solid var(--arbor-primary);
+        border-radius: 0 10px 10px 0;
       }
       
       #toggle-graph-btn-bottom {
         right: 0;
-        border-right: none;
-        border-radius: 8px 0 0 8px;
+        border-right: 3px solid var(--arbor-accent);
+        border-radius: 10px 0 0 10px;
         flex-direction: row-reverse;
       }
       
       .arbor-side-toggle-btn:hover {
-        background: rgba(41, 37, 32, 0.98);
+        background: var(--arbor-bg-elevated);
         border-color: var(--arbor-border-strong);
+        box-shadow: var(--arbor-shadow-lg), 0 0 12px rgba(125, 155, 118, 0.2);
+        transform: translateY(-50%) translateX(2px);
+      }
+      
+      #toggle-graph-btn-bottom:hover {
+        transform: translateY(-50%) translateX(-2px);
       }
       
       .arbor-side-toggle-btn.active {
         background: var(--arbor-primary-soft);
-        border-color: var(--arbor-primary-muted);
+        border-color: var(--arbor-primary);
         color: var(--arbor-primary);
+        box-shadow: var(--arbor-shadow-lg), 0 0 16px rgba(125, 155, 118, 0.3);
+        font-weight: 700;
+      }
+      
+      #toggle-sidebar-btn.active {
+        border-left-width: 4px;
+        box-shadow: var(--arbor-shadow-lg), 0 0 20px rgba(125, 155, 118, 0.4);
+      }
+      
+      #toggle-graph-btn-bottom.active {
+        border-right-width: 4px;
+        border-right-color: var(--arbor-accent);
+        color: var(--arbor-accent);
+        box-shadow: var(--arbor-shadow-lg), 0 0 20px rgba(201, 166, 107, 0.4);
       }
       
       .arbor-side-toggle-btn svg {
         flex-shrink: 0;
+        width: 18px;
+        height: 18px;
+        stroke-width: 1.8;
+        transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      
+      .arbor-side-toggle-btn:hover svg {
+        transform: scale(1.1);
+      }
+      
+      .arbor-side-toggle-btn.active svg {
+        transform: scale(1.15);
+        filter: drop-shadow(0 0 4px currentColor);
+      }
+      
+      .arbor-side-toggle-btn:active {
+        transform: translateY(-50%) scale(0.96);
+      }
+      
+      .arbor-side-toggle-btn:focus-visible {
+        outline: 2px solid var(--arbor-primary);
+        outline-offset: 4px;
       }
 
       /* Focus States */

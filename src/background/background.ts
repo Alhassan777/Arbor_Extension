@@ -4,7 +4,6 @@ import { logger } from "../utils/logger";
 import { getProvider } from "./providers/factory";
 import type { LLMProvider } from "../content/modules/context/llm/LLMServiceFactory";
 
-logger.debug("Background script loaded");
 
 // Listen for extension installation
 chrome.runtime.onInstalled.addListener((details) => {
@@ -21,7 +20,6 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 // Listen for messages from content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  logger.debug("Background received message:", request.action);
 
   // Handle LLM API availability check (multi-provider)
   if (request.action === "check-availability") {
@@ -206,7 +204,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return true;
     }
 
-    logger.debug("Opening graph window for tree:", treeId);
 
     // Create a new popup window for the graph
     chrome.windows.create(
@@ -270,7 +267,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Handle connection label click from graph window
   if (request.action === "graph-window-connection-click") {
     const { treeId, childId, parentId } = request.payload;
-    logger.debug("Graph window connection click:", childId, parentId);
 
     // Forward to content scripts
     chrome.tabs.query({}, (tabs) => {

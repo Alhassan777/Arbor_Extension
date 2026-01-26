@@ -56,15 +56,33 @@ export class ChatGPTPlatform extends BasePlatform {
       title.replace(/\s*\|\s*ChatGPT.*$/, ""),
 
     // Message extraction selectors
+    // Based on ChatGPT's actual HTML structure (as of Jan 2026):
+    // User messages: <div data-message-author-role="user"><div class="user-message-bubble-color"><div class="whitespace-pre-wrap">TEXT</div></div></div>
+    // Assistant messages: <div data-message-author-role="assistant"><div class="markdown prose">...</div></div>
     messageSelectors: {
-      user: ['[data-message-author-role="user"] [class*="markdown"]'],
-      assistant: ['[data-message-author-role="assistant"] [class*="markdown"]'],
+      user: [
+        '[data-message-author-role="user"]',  // Get the parent container with the role
+      ],
+      assistant: [
+        '[data-message-author-role="assistant"]',  // Get the parent container with the role
+      ],
     },
     messageRoleDetector: (element) => {
+      // Check the element itself
       const role = element.getAttribute("data-message-author-role");
       if (role === "user" || role === "assistant") {
         return role;
       }
+      
+      // Check parent element
+      const parent = element.closest('[data-message-author-role]');
+      if (parent) {
+        const parentRole = parent.getAttribute("data-message-author-role");
+        if (parentRole === "user" || parentRole === "assistant") {
+          return parentRole as "user" | "assistant";
+        }
+      }
+      
       return null;
     },
 

@@ -154,6 +154,7 @@ async function saveConfig() {
       provider !== "none" && apiKey && !apiKey.includes("...****")
         ? apiKey
         : undefined;
+    
     const result = await ConfigManager.saveConfig(
       provider,
       model,
@@ -161,6 +162,7 @@ async function saveConfig() {
     );
 
     if (!result.success) {
+      logger.error("Failed to save config:", result.error);
       showStatus(result.error || "Failed to save configuration", "error");
       return;
     }
@@ -181,7 +183,7 @@ async function saveConfig() {
       }
     }
   } catch (error) {
-    logger.error("Failed to save config:", error);
+    logger.error("❌ Failed to save config:", error);
     showStatus(
       error instanceof Error ? error.message : "Failed to save configuration",
       "error",

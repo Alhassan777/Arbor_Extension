@@ -14,6 +14,7 @@ class FullPageGraphView {
   private graphRenderer: GraphRenderer;
   private graphPanZoom: GraphPanZoom;
   private isTreeSelectorOpen: boolean = false;
+  private storageListenerActive: boolean = false;
 
   constructor() {
     // Initialize graph renderer and pan/zoom
@@ -531,6 +532,9 @@ Please select another tree from the dropdown, or create a new tree in the sideba
   }
 
   private setupEventListeners() {
+    // Listen for database changes (tree renames, etc.)
+    this.setupStorageListener();
+
     // Zoom controls
     const zoomInBtn = document.getElementById("zoom-in-btn");
     const zoomOutBtn = document.getElementById("zoom-out-btn");
@@ -628,6 +632,84 @@ Please select another tree from the dropdown, or create a new tree in the sideba
     if (zoomLevel) {
       const scale = this.graphPanZoom.getScale();
       zoomLevel.textContent = `${Math.round(scale * 100)}%`;
+    }
+  }
+
+  private setupStorageListener() {
+    if (this.storageListenerActive) return;
+
+    this.storageListenerActive = true;
+
+    // Listen for update messages from the main extension
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.action === "graph-window-update-tree") {
+        console.log(
+          "🌳 Arbor Graph: Received update notification from main extension",
+        );
+        this.reloadCurrentTree();
+      }
+    });
+
+    // Also poll for database changes as backup (every 3 seconds)
+    const checkInterval = setInterval(async () => {
+      if (!this.currentTreeId) return;
+
+      try {
+        // Fetch the latest version of the current tree from database
+        const updatedTree = await db.getTree(this.currentTreeId);
+
+        if (!updatedTree) {
+          console.log("🌳 Arbor Graph: Tree was deleted, clearing view");
+          clearInterval(checkInterval);
+          this.storageListenerActive = false;
+          return;
+        }
+
+        const cachedTree = this.trees[this.currentTreeId];
+
+        // Check if tree changed (check updatedAt timestamp)
+        if (cachedTree && updatedTree.updatedAt !== cachedTree.updatedAt) {
+          console.log("🌳 Arbor Graph: Tree changed, reloading");
+          await this.reloadCurrentTree();
+        }
+      } catch (error) {
+        console.error("🌳 Arbor Graph: Error checking for updates:", error);
+      }
+    }, 3000); // Check every 3 seconds (less frequent since we have message listener)
+
+    // Clean up on page unload
+    window.addEventListener("beforeunload", () => {
+      clearInterval(checkInterval);
+      this.storageListenerActive = false;
+    });
+  }
+
+  private async reloadCurrentTree() {
+    if (!this.currentTreeId) return;
+
+    try {
+      console.log("🌳 Arbor Graph: Reloading tree data from database");
+
+      // Fetch fresh data from database
+      const updatedTree = await db.getTree(this.currentTreeId);
+
+      if (!updatedTree) {
+        console.warn("🌳 Arbor Graph: Tree no longer exists");
+        return;
+      }
+
+      // Update cache
+      this.trees[this.currentTreeId] = updatedTree;
+
+      // Update the tree selector display (shows tree name)
+      this.updateTreeSelector();
+
+      // Re-render the graph (will show updated node titles)
+      this.graphRenderer.renderGraph(updatedTree, "graph-content");
+
+      console.log("🌳 Arbor Graph: Tree reloaded successfully");
+    } catch (error) {
+      console.error("🌳 Arbor Graph: Error reloading tree:", error);
     }
   }
 

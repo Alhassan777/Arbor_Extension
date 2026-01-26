@@ -55,18 +55,15 @@ export abstract class BaseProvider {
       }
       const apiKey = await getApiKey(this.provider as ProviderType);
       if (!apiKey) {
-        logger.debug(`${this.provider} API key not found`);
         return false;
       }
 
       // Validate format using config
       const metadata = this.config.metadata;
       if (!apiKey.startsWith(metadata.apiKeyPrefix) || apiKey.length < metadata.apiKeyMinLength) {
-        logger.debug(`Invalid ${this.provider} API key format`);
         return false;
       }
 
-      logger.debug(`${this.provider} API key found`);
       return true;
     } catch (error) {
       logger.error(`Error checking ${this.provider} availability:`, error);
@@ -133,7 +130,7 @@ export abstract class BaseProvider {
         initialDelay: 1000,
         maxDelay: 30000,
         onRetry: (attempt, error) => {
-          logger.debug(`Retrying ${this.provider} API call (attempt ${attempt}):`, error);
+          // Silent retry
         },
       }
     );

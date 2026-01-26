@@ -100,15 +100,40 @@ export abstract class BasePlatform implements Platform {
   }
 
   /**
-   * Copy text to clipboard
+   * Copy text to clipboard with fallback methods
    */
   async copyToClipboard(text: string): Promise<boolean> {
     try {
+      // Method 1: Try navigator.clipboard (modern, requires focus)
       await navigator.clipboard.writeText(text);
       return true;
     } catch (error) {
-      console.error("Failed to copy to clipboard:", error);
-      return false;
+      // Method 2: Try focusing the window first, then retry
+      try {
+        window.focus();
+        await new Promise(resolve => setTimeout(resolve, 100)); // Give time for focus
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (refocusError) {
+        // Method 3: Fallback to document.execCommand (deprecated but works without focus)
+        try {
+          const textArea = document.createElement("textarea");
+          textArea.value = text;
+          textArea.style.position = "fixed";
+          textArea.style.left = "-999999px";
+          textArea.style.top = "-999999px";
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+          
+          const successful = document.execCommand('copy');
+          document.body.removeChild(textArea);
+          
+          return successful;
+        } catch (execCommandError) {
+          return false;
+        }
+      }
     }
   }
 
@@ -419,7 +444,6 @@ export abstract class BasePlatform implements Platform {
           await focusElement(element as HTMLElement);
           this.setInputValueByType(element as HTMLElement, text, inputType);
 
-          console.log(`🌳 Arbor: Context pasted into ${this.name} input field`);
           return true;
         }
 
@@ -553,26 +577,63 @@ export abstract class BasePlatform implements Platform {
     const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
     const platformConfig = this.getConfig();
     const config = platformConfig.messageSelectors;
+    const seen = new Set<string>(); // Track seen content to avoid duplicates
+
+    // Helper to add message if not duplicate
+    const addMessage = (role: "user" | "assistant", content: string, source: string) => {
+      const trimmed = content.trim();
+      if (!trimmed || seen.has(trimmed)) return false;
+      
+      messages.push({ role, content: trimmed });
+      seen.add(trimmed);
+      return true;
+    };
 
     // Try role-specific selectors first
-    if (config.user.length > 0 || config.assistant.length > 0) {
-      config.user.forEach((selector) => {
-        document.querySelectorAll(selector).forEach((el) => {
-          const content = el.textContent?.trim();
-          if (content) {
-            messages.push({ role: "user", content });
+    if (config.user && config.user.length > 0) {
+      for (const selector of config.user) {
+        const elements = document.querySelectorAll(selector);
+        
+        elements.forEach((el) => {
+          // Use role detector if available to verify role
+          const detectedRole = platformConfig.messageRoleDetector?.(el);
+          
+          if (detectedRole === "user") {
+            addMessage("user", el.textContent || "", selector);
+          } else if (!detectedRole) {
+            // If no detector or inconclusive, assume it's user since we're using user selector
+            addMessage("user", el.textContent || "", selector);
           }
         });
-      });
+        
+        // If we found user messages with this selector, we can break
+        if (messages.some(m => m.role === 'user')) {
+          break;
+        }
+      }
+    }
 
-      config.assistant.forEach((selector) => {
-        document.querySelectorAll(selector).forEach((el) => {
-          const content = el.textContent?.trim();
-          if (content) {
-            messages.push({ role: "assistant", content });
+    if (config.assistant && config.assistant.length > 0) {
+      for (const selector of config.assistant) {
+        const elements = document.querySelectorAll(selector);
+        
+        elements.forEach((el) => {
+          // Use role detector if available to verify role
+          const detectedRole = platformConfig.messageRoleDetector?.(el);
+          
+          if (detectedRole === "assistant") {
+            addMessage("assistant", el.textContent || "", selector);
+          } else if (!detectedRole) {
+            // If no detector or inconclusive, assume it's assistant since we're using assistant selector
+            addMessage("assistant", el.textContent || "", selector);
           }
         });
-      });
+        
+        // If we found assistant messages with this selector, we can break
+        if (messages.some(m => m.role === 'assistant')) {
+          break;
+        }
+      }
     }
 
     // Fallback: Use container selectors with role detector
@@ -582,7 +643,8 @@ export abstract class BasePlatform implements Platform {
       config.container.length > 0
     ) {
       config.container.forEach((selector) => {
-        document.querySelectorAll(selector).forEach((el) => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach((el) => {
           const content = el.textContent?.trim();
           if (!content) return;
 
@@ -605,10 +667,14 @@ export abstract class BasePlatform implements Platform {
           }
 
           if (role) {
-            messages.push({ role, content });
+            addMessage(role, content, selector);
           }
         });
       });
+    }
+    
+    if (messages.length === 0) {
+      console.error(`🌳 Arbor: ⚠️ NO MESSAGES EXTRACTED!`);
     }
 
     return messages;

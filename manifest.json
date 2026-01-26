@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Arbor - Chat Tree Navigator",
   "description": "Organize ChatGPT, Gemini, Claude, and Perplexity conversations into tree structures with branches, graphs and AI context generation.",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "permissions": [
     "storage",
     "activeTab",

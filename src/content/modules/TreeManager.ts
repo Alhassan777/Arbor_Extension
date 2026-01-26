@@ -6,7 +6,6 @@ export class TreeManager {
     name: string,
     platform: "chatgpt" | "gemini" | "claude" | "perplexity"
   ): Promise<ChatTree> {
-    console.log('🌳 TreeManager: Creating new tree:', name);
     
     const treeId = `tree-${Date.now()}-${Math.random()
       .toString(36)
@@ -37,11 +36,8 @@ export class TreeManager {
       updatedAt: new Date().toISOString(),
     };
 
-    console.log('🌳 TreeManager: Saving tree to database:', treeId);
     await db.saveTree(tree);
-    console.log('🌳 TreeManager: Saving root node to database:', rootNodeId);
     await db.saveNode(rootNode, treeId);
-    console.log('🌳 TreeManager: Tree created successfully:', treeId);
 
     return tree;
   }
@@ -101,7 +97,15 @@ export class TreeManager {
     const tree = trees[treeId];
     if (!tree) return;
 
+    // Update both tree name AND root node title for consistency
     tree.name = newName;
+    const rootNode = tree.nodes[tree.rootNodeId];
+    if (rootNode) {
+      rootNode.title = newName;
+      rootNode.updatedAt = new Date().toISOString();
+      await db.saveNode(rootNode, treeId);
+    }
+    
     tree.updatedAt = new Date().toISOString();
     await db.saveTree(tree);
   }

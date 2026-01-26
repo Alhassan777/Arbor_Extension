@@ -31,7 +31,6 @@ export class OpenAIProvider extends BaseProvider {
       temperature: 0.7,
     };
 
-    logger.debug(`Calling OpenAI API (model: ${model})`);
 
     let response: Response;
     try {

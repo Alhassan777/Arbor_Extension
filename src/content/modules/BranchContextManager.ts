@@ -68,33 +68,13 @@ export class BranchContextManager {
       const llmService = await LLMConfigManager.getLLMService();
 
       if (llmService) {
-        const serviceType = llmService.constructor.name;
-        console.log(`🌳 Arbor: LLM service type: ${serviceType}`);
-        console.log(`🌳 Arbor: Provider: ${config.provider}`);
-
         // Check actual availability (no optimistic assumptions)
         const isAvailable = await llmService.isAvailable();
 
         if (isAvailable) {
           // Update SummaryFormatter with LLM service
           this.formatters.set("summary", new SummaryFormatter(llmService));
-          console.log(
-            `🌳 Arbor: ✅ LLM service (${serviceType}) initialized and ready for AI summarization`
-          );
-        } else {
-          // Service configured but not available - use text-based fallback
-          console.log(
-            `🌳 Arbor: ❌ LLM service (${serviceType}) is not available`
-          );
-          console.log(`🌳 Arbor: 💡 Will use text-based summary fallback`);
-          console.log(
-            `🌳 Arbor: 💡 Configure your Gemini API key in extension settings`
-          );
         }
-      } else {
-        console.log(
-          "🌳 Arbor: No LLM service configured, using text-based processing only"
-        );
       }
     } catch (error) {
       // Silent failure - extension works fine without LLM
@@ -193,7 +173,6 @@ export class BranchContextManager {
         
         // Check if adding this message would exceed memory limit
         if (totalChars + msgLength > MAX_CHARS) {
-          console.warn(`🌳 Arbor: Memory limit reached, truncating messages at ${messages.length} messages`);
           truncated = true;
           break;
         }
@@ -213,6 +192,10 @@ export class BranchContextManager {
       
       if (truncated && progressCallback) {
         progressCallback(`Processing ${messages.length} messages (memory limit reached)...`);
+      }
+      
+      if (messages.length === 0) {
+        console.error(`🌳 Arbor: ⚠️ NO MESSAGES EXTRACTED! This will result in empty context.`);
       }
 
       // Get selected text (if any)
@@ -305,10 +288,9 @@ export class BranchContextManager {
         return {
           success: false,
           context,
-          error: "Failed to copy to clipboard",
+          error: "Failed to copy to clipboard. The page may not have focus. Please click on the page and try again.",
         };
       }
-
       return {
         success: true,
         context,

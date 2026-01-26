@@ -86,7 +86,6 @@ export class RequestQueue {
                        error.message.includes('timeout')));
             },
             onRetry: (attempt, error) => {
-              logger.debug(`RequestQueue: Retrying ${request.action} (attempt ${attempt})`, error);
             },
           }
         );

@@ -9,6 +9,7 @@ import { SidebarRenderer } from "./SidebarRenderer";
 import { GraphViewRenderer } from "./GraphViewRenderer";
 import { ToggleButtonsManager } from "./ToggleButtonsManager";
 import { SidebarListeners } from "./SidebarListeners";
+import { db } from "../db";
 
 export interface AvailableChat {
   id: string;
@@ -175,7 +176,6 @@ export class UIInjector {
   private async openFullPageGraph() {
     // Get current tree ID from IndexedDB via db module
     try {
-      const { db } = await import("../db");
       const state = await db.getState();
       const treeId = state.currentTreeId;
 

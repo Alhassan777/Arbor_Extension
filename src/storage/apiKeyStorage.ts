@@ -206,7 +206,6 @@ export async function getApiKey(provider: ProviderType): Promise<string | null> 
         const stored = result[storageKey];
         
         if (!stored) {
-          logger.debug(`No ${provider} API key found in storage`);
           resolve(null);
           return;
         }
@@ -214,7 +213,6 @@ export async function getApiKey(provider: ProviderType): Promise<string | null> 
         try {
           if (isEncrypted(stored)) {
             const apiKey = await decryptApiKey(stored.encrypted, stored.iv);
-            logger.debug(`${provider} API key retrieved from storage`);
             resolve(apiKey);
           } else {
             logger.error(`Invalid ${provider} API key format in storage`);
@@ -262,7 +260,6 @@ export async function setApiKey(apiKey: string, provider: ProviderType): Promise
           return;
         }
 
-        logger.debug(`${provider} API key encrypted and saved to secure storage`);
         resolve({ success: true });
       });
     });
@@ -288,7 +285,6 @@ export async function removeApiKey(provider: ProviderType): Promise<{ success: b
           return;
         }
 
-        logger.debug(`${provider} API key removed from storage`);
         resolve({ success: true });
       });
     });

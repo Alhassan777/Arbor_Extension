@@ -416,12 +416,12 @@ export class GraphRenderer {
   }
 
   private calculateTreeHash(tree: ChatTree): string {
-    // Simple hash based on node IDs and parent relationships
+    // Hash based on node IDs, parent relationships, AND titles to detect any changes
     const nodeIds = Object.keys(tree.nodes).sort();
     const structure = nodeIds
       .map((id) => {
         const node = tree.nodes[id];
-        return `${id}:${node.parentId || "root"}:${node.children.join(",")}`;
+        return `${id}:${node.parentId || "root"}:${node.children.join(",")}:${node.title}:${node.customEmoji || ""}`;
       })
       .join("|");
     return structure;
