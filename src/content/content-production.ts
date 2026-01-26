@@ -24,6 +24,10 @@ import {
   type BranchDialogResult,
 } from "./modules/BranchConnectionTypeDialog";
 import { formatErrorForUI } from "../utils/errorMessages";
+import {
+  getSessionStorage,
+  removeSessionStorage,
+} from "../utils/sessionStorage";
 import type { ExtensionState, ChatTree, ConnectionType } from "../types";
 import type { AvailableChat } from "./modules/ChatDetector";
 
@@ -84,27 +88,65 @@ class ArborExtension {
   }
 
   async init() {
-    console.log("🌳 Arbor Extension: Initializing...");
-
-    // Listen for model download completion
+    // Listen for messages from background script and graph window
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (message.action === "model-download-complete") {
-        console.log(
-          `🌳 Arbor: ✅ Model downloaded successfully in ${message.loadTime}s`,
-        );
         this.showNotification(
           `Model ready! Downloaded in ${message.loadTime}s`,
           "success",
         );
+        return false;
       }
+
+      // Handle navigate to node request from graph window
+      if (message.action === "navigate-to-node") {
+        const { treeId, nodeId } = message.payload;
+
+        // Only handle if it's for the current tree
+        if (treeId === this.state.currentTreeId) {
+          this.handleNodeClick(nodeId)
+            .then(() => {
+              sendResponse({ success: true });
+            })
+            .catch((error) => {
+              sendResponse({ success: false, error: error.message });
+            });
+          return true; // Keep channel open for async response
+        }
+        return false;
+      }
+
+      // Handle edit connection label request from graph window
+      if (message.action === "edit-connection-label") {
+        const { treeId, childId, parentId } = message.payload;
+
+        // Only handle if it's for the current tree
+        if (treeId === this.state.currentTreeId) {
+          this.handleConnectionLabelClick(childId, parentId)
+            .then(() => {
+              sendResponse({ success: true });
+            })
+            .catch((error) => {
+              sendResponse({ success: false, error: error.message });
+            });
+          return true; // Keep channel open for async response
+        }
+        return false;
+      }
+
       return false;
     });
 
     await db.init();
-    console.log("✅ IndexedDB initialized");
+
+    // Force migration of trees to chrome.storage.local for cross-context access
+    try {
+      await db.forceMigration();
+    } catch (error) {
+      // Silent fail
+    }
 
     await this.loadState();
-    console.log("✅ State loaded");
 
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", () => this.onPageReady());
@@ -138,8 +180,6 @@ class ArborExtension {
   }
 
   private onPageReady() {
-    console.log("📄 Page ready");
-
     this.injectUI();
     this.setupSidebarObserver();
     this.scanAvailableChats();
@@ -210,7 +250,6 @@ class ArborExtension {
 
       if (isVisible && !wasVisible) {
         // Tab became visible - scan immediately and restart intervals
-        console.log("🌳 Arbor: Tab visible, resuming scans");
         consecutiveNoChanges = 0; // Reset backoff
         stopScanning();
         this.scanAvailableChats();
@@ -254,7 +293,7 @@ class ArborExtension {
 
         // Check if we have branch context to handle (using secure chrome.storage.session)
         try {
-          const data = await chrome.storage.session.get([
+          const data = await getSessionStorage([
             "arbor_branch_parent_node_id",
             "arbor_branch_parent_tree_id",
             "arbor_branch_timestamp",
@@ -313,7 +352,6 @@ class ArborExtension {
     this.graphRenderer.setGraphPanZoom(this.graphPanZoom);
 
     this.sidebarInjected = true;
-    console.log("✅ UI injected");
 
     // Render graph if a tree is selected (for re-injection scenarios)
     if (this.state.currentTreeId) {
@@ -352,6 +390,7 @@ class ArborExtension {
             this.renderGraph();
           }
         }
+        this.checkResetButtonVisibility();
       });
 
     // Listen for reset layout event from GraphRenderer
@@ -362,7 +401,17 @@ class ArborExtension {
           this.renderGraph();
         }
       }
+      this.checkResetButtonVisibility();
     });
+
+    // Note: Pan/zoom changes no longer affect reset-layout-btn visibility
+    // The reset-layout-btn only shows when layout structure is manually changed
+  }
+
+  private checkResetButtonVisibility() {
+    if (this.graphRenderer && this.graphPanZoom) {
+      this.graphRenderer.checkAndShowResetButton(this.graphPanZoom);
+    }
   }
 
   private updateZoomDisplay() {
@@ -374,41 +423,12 @@ class ArborExtension {
   }
 
   private async refreshSidebar() {
-    console.log("📋 [DRAG-DEBUG] REFRESH SIDEBAR START:", {
-      currentTreeId: this.state.currentTreeId,
-      treesCount: Object.keys(this.state.trees).length,
-      currentTree: this.state.currentTreeId
-        ? (() => {
-            const treeId = this.state.currentTreeId!;
-            const tree = this.state.trees[treeId];
-            return {
-              nodeCount: Object.keys(tree.nodes).length,
-              structure: Object.keys(tree.nodes).map((id) => {
-                const node = tree.nodes[id];
-                return {
-                  id,
-                  parentId: node?.parentId || null,
-                  children: node?.children || [],
-                };
-              }),
-            };
-          })()
-        : null,
-      timestamp: Date.now(),
-    });
-
     const untrackedChats = this.getUntrackedChats();
     await this.uiInjector.injectSidebar(
       this.state.trees,
       this.state.currentTreeId,
       untrackedChats,
     );
-
-    console.log("📋 [DRAG-DEBUG] REFRESH SIDEBAR COMPLETE - DOM state:", {
-      sidebarExists: !!document.getElementById("arbor-sidebar-container"),
-      treeNodesInDOM: document.querySelectorAll(".tree-node").length,
-      timestamp: Date.now(),
-    });
   }
 
   private getUntrackedChats(): AvailableChat[] {
@@ -542,6 +562,9 @@ class ArborExtension {
           }
         }, 100);
         break;
+      case "openGraphWindow":
+        await this.openGraphWindow();
+        break;
       case "newChat":
         await this.createNewChat();
         break;
@@ -571,15 +594,6 @@ class ArborExtension {
         break;
       case "reparentNode":
         if (data?.nodeId && data?.newParentId && this.state.currentTreeId) {
-          console.log("📥 [DRAG-DEBUG] REPARENT ACTION RECEIVED:", {
-            nodeId: data.nodeId,
-            newParentId: data.newParentId,
-            currentTreeId: this.state.currentTreeId,
-            sidebarNodeCount: document.querySelectorAll(`[data-node-id="${data.nodeId}"]`).length,
-            graphNodeCount: document.querySelectorAll(`.graph-node[data-node-id="${data.nodeId}"]`).length,
-            timestamp: Date.now(),
-          });
-
           const tree = this.state.trees[this.state.currentTreeId];
           const success = await this.nodeManager.reparentNode(
             data.nodeId,
@@ -588,16 +602,9 @@ class ArborExtension {
             this.state.currentTreeId,
           );
           if (success) {
-            console.log("✅ [DRAG-DEBUG] REPARENT SUCCESS - Triggering refresh");
             this.showNotification("Node reparented! 🔄", "success");
             this.refresh();
-            console.log("🔄 [DRAG-DEBUG] REFRESH COMPLETE - Checking DOM:", {
-              sidebarNodeCount: document.querySelectorAll(`[data-node-id="${data.nodeId}"]`).length,
-              graphNodeCount: document.querySelectorAll(`.graph-node[data-node-id="${data.nodeId}"]`).length,
-              timestamp: Date.now(),
-            });
           } else {
-            console.log("❌ [DRAG-DEBUG] REPARENT FAILED");
             this.showNotification(
               "Cannot reparent node (would create cycle or invalid structure)",
               "error",
@@ -615,6 +622,15 @@ class ArborExtension {
           await this.renameTreeById(data.treeId, data.newName);
         }
         break;
+      case "setNodeEmoji":
+        if (
+          data?.nodeId &&
+          data?.emoji !== undefined &&
+          this.state.currentTreeId
+        ) {
+          await this.setNodeEmoji(data.nodeId, data.emoji);
+        }
+        break;
     }
   }
 
@@ -628,6 +644,24 @@ class ArborExtension {
     this.state.currentNodeId = tree.rootNodeId;
 
     await this.saveState();
+
+    // Verify the tree was saved to database
+    try {
+      const verification = await db.verifyDatabase();
+      console.log(
+        "🌳 Arbor: Database verification after tree creation:",
+        verification,
+      );
+
+      if (verification.trees === 0) {
+        this.showNotification(
+          "Warning: Tree may not persist. Check console for details.",
+          "error",
+        );
+      }
+    } catch (error) {
+    }
+
     this.showNotification(`Tree "${name}" created! 🌳`, "success");
     this.refresh();
   }
@@ -636,6 +670,35 @@ class ArborExtension {
     const url = this.platform === "chatgpt" ? "https://chatgpt.com/" : "";
     if (url) {
       window.location.href = url;
+    }
+  }
+
+  private async openGraphWindow() {
+    if (!this.state.currentTreeId) {
+      this.showNotification("No tree selected", "error");
+      return;
+    }
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: "open-graph-window",
+        payload: {
+          treeId: this.state.currentTreeId,
+        },
+      });
+
+      if (response?.success) {
+        this.showNotification("Graph window opened! 📊", "success");
+      } else {
+        this.showNotification(
+          "Failed to open graph window: " +
+            (response?.error || "Unknown error"),
+          "error",
+        );
+      }
+    } catch (error) {
+      console.error("Failed to open graph window:", error);
+      this.showNotification("Failed to open graph window", "error");
     }
   }
 
@@ -864,6 +927,32 @@ class ArborExtension {
     this.refresh();
   }
 
+  private async setNodeEmoji(nodeId: string, emoji: string) {
+    if (!this.state.currentTreeId) {
+      this.showNotification("No tree selected", "error");
+      return;
+    }
+
+    const tree = this.state.trees[this.state.currentTreeId];
+    const node = tree?.nodes[nodeId];
+
+    if (!node) {
+      this.showNotification("Node not found", "error");
+      return;
+    }
+
+    // Set or clear emoji (empty string clears it)
+    node.customEmoji = emoji || undefined;
+    node.updatedAt = new Date().toISOString();
+
+    await db.saveNode(node, this.state.currentTreeId);
+    await db.saveTree(tree);
+    await this.saveState();
+
+    this.showNotification(`Emoji updated! ${emoji || "Removed"}`, "success");
+    this.refresh();
+  }
+
   private async deleteTree() {
     if (!this.state.currentTreeId) {
       this.showNotification("No tree selected", "error");
@@ -1029,7 +1118,7 @@ class ArborExtension {
   private async handleAutoPasteAndTreeAddition() {
     try {
       // Check if we have stored context from branch creation (using secure chrome.storage.session)
-      const data = await chrome.storage.session.get([
+      const data = await getSessionStorage([
         "arbor_branch_context",
         "arbor_branch_parent_node_id",
         "arbor_branch_parent_tree_id",
@@ -1089,7 +1178,6 @@ class ArborExtension {
         }, 2000);
       }
     } catch (error) {
-      console.error("🌳 Arbor: Error handling auto-paste:", error);
     }
   }
 
@@ -1125,7 +1213,6 @@ class ArborExtension {
       // Check if this chat is already in the tree
       const tree = this.state.trees[parentTreeId];
       if (!tree) {
-        console.warn("🌳 Arbor: Parent tree not found");
         this.clearBranchContext();
         return;
       }
@@ -1164,7 +1251,6 @@ class ArborExtension {
       this.renderGraph();
       this.clearBranchContext();
     } catch (error) {
-      console.error("🌳 Arbor: Error adding new chat to tree:", error);
       this.clearBranchContext();
     }
   }
@@ -1173,16 +1259,14 @@ class ArborExtension {
    * Clear stored branch context from chrome.storage.session
    */
   private clearBranchContext() {
-    chrome.storage.session
-      .remove([
-        "arbor_branch_context",
-        "arbor_branch_parent_node_id",
-        "arbor_branch_parent_tree_id",
-        "arbor_branch_timestamp",
-      ])
-      .catch((error) => {
-        console.error("Failed to clear branch context:", error);
-      });
+    removeSessionStorage([
+      "arbor_branch_context",
+      "arbor_branch_parent_node_id",
+      "arbor_branch_parent_tree_id",
+      "arbor_branch_timestamp",
+    ]).catch((error) => {
+      console.error("Failed to clear branch context:", error);
+    });
   }
 
   private async handleNodeClick(nodeId: string) {
@@ -1309,17 +1393,29 @@ class ArborExtension {
   }
 
   private refresh() {
-    console.log("🔄 [DRAG-DEBUG] REFRESH START:", {
-      currentTreeId: this.state.currentTreeId,
-      treeNodeCount: this.state.currentTreeId
-        ? Object.keys(this.state.trees[this.state.currentTreeId].nodes).length
-        : 0,
-      timestamp: Date.now(),
-    });
     this.refreshSidebar();
-    console.log("🔄 [DRAG-DEBUG] SIDEBAR REFRESHED");
     this.renderGraph();
-    console.log("🔄 [DRAG-DEBUG] GRAPH RENDERED");
+    this.notifyGraphWindow();
+  }
+
+  private notifyGraphWindow() {
+    // Notify any open graph windows to update
+    if (this.state.currentTreeId) {
+      chrome.runtime.sendMessage(
+        {
+          action: "graph-window-update-tree",
+          payload: {
+            treeId: this.state.currentTreeId,
+          },
+        },
+        (response) => {
+          // Ignore response - graph window may not be open
+          if (chrome.runtime.lastError) {
+            // Silent fail - no graph window open
+          }
+        },
+      );
+    }
   }
 
   private showNotification(
@@ -1456,26 +1552,10 @@ class ArborExtension {
 }
 
 // Initialize extension
-console.log(
-  `🌳 Arbor: Content script loaded! Checking platform on hostname: ${window.location.hostname}`,
-);
-console.log(`🌳 Arbor: Full URL: ${window.location.href}`);
-console.log(`🌳 Arbor: Document ready state: ${document.readyState}`);
-
 const platform = detectPlatform();
 if (platform) {
-  console.log(`🌳 Arbor: ✅ Platform detected: ${platform}`);
   try {
     new ArborExtension(platform);
-    console.log(`🌳 Arbor: ✅ Extension initialized successfully`);
   } catch (error) {
-    console.error(`🌳 Arbor: ❌ Failed to initialize extension:`, error);
   }
-} else {
-  console.error(
-    `🌳 Arbor: ❌ Platform not supported on ${window.location.hostname}`,
-  );
-  console.log(
-    "🌳 Arbor: Available platforms: chatgpt, gemini, claude, perplexity",
-  );
 }

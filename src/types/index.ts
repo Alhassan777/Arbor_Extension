@@ -18,6 +18,7 @@ export interface ChatNode {
   customPosition?: { x: number; y: number }; // Custom position on canvas
   color?: string; // Hex color code
   shape?: 'rectangle' | 'circle' | 'rounded' | 'diamond';
+  customEmoji?: string; // Custom emoji for the node
 }
 
 export interface Connection {

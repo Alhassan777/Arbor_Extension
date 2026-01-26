@@ -101,6 +101,8 @@ export class GraphRenderer {
     } else {
       this.manualPositions.clear();
       this.isLayoutManual = false;
+      // Hide reset button when no tree is selected
+      this.hideResetButton();
     }
   }
 
@@ -120,12 +122,15 @@ export class GraphRenderer {
         this.isLayoutManual = saved.isManual || false;
 
         // Show reset button if there are manual positions
+        // Note: zoom/pan check will be done separately when graph is rendered
         if (this.isLayoutManual && this.manualPositions.size > 0) {
           this.showResetButton();
         }
       } else {
         this.manualPositions.clear();
         this.isLayoutManual = false;
+        // Hide reset button when tree has no manual positions
+        this.hideResetButton();
       }
     } catch (error) {
       console.error("Failed to load manual positions:", error);
@@ -159,9 +164,8 @@ export class GraphRenderer {
     this.manualPositions.clear();
     this.isLayoutManual = false;
 
-    // Hide reset button
-    const resetBtn = document.getElementById("reset-layout-btn");
-    if (resetBtn) resetBtn.style.display = "none";
+    // Hide reset button (will be shown again if needed after checking state)
+    this.hideResetButton();
 
     // Clear from storage
     if (this.currentTreeId) {
@@ -186,6 +190,31 @@ export class GraphRenderer {
     const resetBtn = document.getElementById("reset-layout-btn");
     if (resetBtn) {
       resetBtn.style.display = "flex";
+    }
+  }
+
+  private hideResetButton() {
+    const resetBtn = document.getElementById("reset-layout-btn");
+    if (resetBtn) {
+      resetBtn.style.display = "none";
+    }
+  }
+
+  /**
+   * Check if graph layout has been modified from default and show reset button if needed
+   * Only checks for manual layout changes, not zoom/pan changes
+   */
+  checkAndShowResetButton(graphPanZoom?: any) {
+    // Check if nodes have been moved (manual layout changes)
+    const hasManualPositions =
+      this.isLayoutManual && this.manualPositions.size > 0;
+
+    // Only show reset button for layout changes, not zoom/pan changes
+    // Zoom/pan has its own separate reset button (zoom-reset-btn)
+    if (hasManualPositions) {
+      this.showResetButton();
+    } else {
+      this.hideResetButton();
     }
   }
 
@@ -304,8 +333,8 @@ export class GraphRenderer {
         // Mark as manual layout
         this.isLayoutManual = true;
 
-        // Show reset button
-        this.showResetButton();
+        // Show reset button (will check zoom/pan state too)
+        this.checkAndShowResetButton(this.graphPanZoom);
 
         // Save to storage
         await this.saveManualPositions();
@@ -346,22 +375,7 @@ export class GraphRenderer {
     const treeHash = this.calculateTreeHash(tree);
     const fullRender = this.lastTreeHash !== treeHash;
 
-    console.log("🎨 [DRAG-DEBUG] GRAPH RENDER:", {
-      treeHash,
-      lastTreeHash: this.lastTreeHash,
-      fullRender,
-      nodeCount: Object.keys(tree.nodes).length,
-      domNodeCount: container.querySelectorAll(".graph-node").length,
-      treeStructure: Object.keys(tree.nodes).map((id) => ({
-        id,
-        parentId: tree.nodes[id].parentId,
-        childrenCount: tree.nodes[id].children.length,
-      })),
-      timestamp: Date.now(),
-    });
-
     if (fullRender) {
-      console.log("🔄 [DRAG-DEBUG] FULL RENDER TRIGGERED - Clearing state and DOM");
       // Tree structure changed, clear differential state
       this.renderedNodes.clear();
       this.renderedConnections.clear();
@@ -416,15 +430,10 @@ export class GraphRenderer {
   private cleanupRemovedElements(tree: ChatTree, container: HTMLElement) {
     // Remove nodes that no longer exist
     const existingNodes = container.querySelectorAll(".graph-node");
-    console.log("🧹 [DRAG-DEBUG] CLEANUP START:", {
-      domNodeCount: existingNodes.length,
-      treeNodeCount: Object.keys(tree.nodes).length,
-    });
-    
+
     existingNodes.forEach((nodeEl) => {
       const nodeId = (nodeEl as HTMLElement).dataset.nodeId;
       if (nodeId && !tree.nodes[nodeId]) {
-        console.log("🗑️ [DRAG-DEBUG] REMOVING STALE DOM NODE:", nodeId);
         // Clean up drag handlers
         const state = this.dragState.get(nodeId);
         if (state?.cleanupFn) {
@@ -541,16 +550,6 @@ export class GraphRenderer {
   private calculateAutoLayout(
     tree: ChatTree,
   ): Record<string, { x: number; y: number }> {
-    console.log("📐 [DRAG-DEBUG] CALCULATE AUTO LAYOUT START:", {
-      rootNodeId: tree.rootNodeId,
-      totalNodes: Object.keys(tree.nodes).length,
-      treeStructure: Object.keys(tree.nodes).map((id) => ({
-        id,
-        parentId: tree.nodes[id].parentId,
-        children: tree.nodes[id].children,
-      })),
-    });
-
     const autoPositions: Record<string, { x: number; y: number }> = {};
 
     // Constants from design spec
@@ -967,7 +966,6 @@ export class GraphRenderer {
       nodeEl.innerHTML = `
         ${rootAccent}
         <div class="graph-node-title">${node.title}</div>
-        <div class="graph-node-platform">${node.platform}</div>
       `;
 
       nodeEl.addEventListener("click", (e) => {

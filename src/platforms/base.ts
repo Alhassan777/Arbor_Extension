@@ -1,9 +1,14 @@
-import { Platform } from '../types';
-import { PlatformConfig } from './config';
-import * as domUtils from './utils/dom';
-import * as reactUtils from './utils/react';
-import { debounce, findBestMatch, isElementVisible } from './utils/dom';
-import { setInputValue, setContentEditableValue, focusElement } from './utils/react';
+import { Platform } from "../types";
+import { PlatformConfig } from "./config";
+import * as domUtils from "./utils/dom";
+import * as reactUtils from "./utils/react";
+import { debounce, findBestMatch, isElementVisible } from "./utils/dom";
+import {
+  setInputValue,
+  setContentEditableValue,
+  focusElement,
+} from "./utils/react";
+import { setSessionStorage } from "../utils/sessionStorage";
 
 /**
  * Abstract base class with shared functionality for all platform adapters
@@ -11,20 +16,26 @@ import { setInputValue, setContentEditableValue, focusElement } from './utils/re
 export abstract class BasePlatform implements Platform {
   abstract name: string;
   config?: PlatformConfig; // Optional - for future configuration-based implementation
-  
+
   abstract renameChat(chatUrl: string, newTitle: string): Promise<boolean>;
-  
+
   // Cleanup tracking
   protected cleanupFunctions: Array<() => void> = [];
-  
+
   // Rate limiting
-  protected rateLimiter: Map<string, { lastAttempt: number; attempts: number }> = new Map();
-  
+  protected rateLimiter: Map<
+    string,
+    { lastAttempt: number; attempts: number }
+  > = new Map();
+
   // Selector caching
-  protected selectorCache: Map<string, { selector: string; timestamp: number }> = new Map();
-  
+  protected selectorCache: Map<
+    string,
+    { selector: string; timestamp: number }
+  > = new Map();
+
   // Shared implementations
-  
+
   /**
    * Cleanup all observers and event listeners
    * Call this when the platform is no longer needed
@@ -35,11 +46,11 @@ export abstract class BasePlatform implements Platform {
     this.rateLimiter.clear();
     this.selectorCache.clear();
   }
-  
+
   /**
    * Check if an operation should be attempted based on rate limiting
    * Prevents spam when operations repeatedly fail
-   * 
+   *
    * @param operationKey - Unique key for the operation
    * @param cooldownMs - Cooldown period in milliseconds (default: 5000)
    * @param maxAttempts - Maximum attempts before cooldown (default: 3)
@@ -48,7 +59,7 @@ export abstract class BasePlatform implements Platform {
   protected shouldAttempt(
     operationKey: string,
     cooldownMs: number = 5000,
-    maxAttempts: number = 3
+    maxAttempts: number = 3,
   ): boolean {
     const now = Date.now();
     const limitInfo = this.rateLimiter.get(operationKey);
@@ -76,7 +87,7 @@ export abstract class BasePlatform implements Platform {
     limitInfo.lastAttempt = now;
     return true;
   }
-  
+
   /**
    * Get the selected/highlighted text in the chat
    */
@@ -87,7 +98,7 @@ export abstract class BasePlatform implements Platform {
     }
     return selection.toString().trim();
   }
-  
+
   /**
    * Copy text to clipboard
    */
@@ -96,19 +107,21 @@ export abstract class BasePlatform implements Platform {
       await navigator.clipboard.writeText(text);
       return true;
     } catch (error) {
-      console.error('Failed to copy to clipboard:', error);
+      console.error("Failed to copy to clipboard:", error);
       return false;
     }
   }
-  
+
   /**
    * Get last N messages for context
    */
-  getRecentMessages(count: number = 10): Array<{ role: 'user' | 'assistant'; content: string }> {
+  getRecentMessages(
+    count: number = 10,
+  ): Array<{ role: "user" | "assistant"; content: string }> {
     const allMessages = this.extractMessages();
     return allMessages.slice(-count);
   }
-  
+
   /**
    * Generate context prompt for branching
    */
@@ -144,36 +157,36 @@ export abstract class BasePlatform implements Platform {
 
       const description = relationshipDescriptions[connectionType];
       if (description) {
-        context += description + '\n\n';
+        context += description + "\n\n";
       }
     }
 
-    context += 'Please continue from here.';
+    context += "Please continue from here.";
     return context;
   }
-  
+
   /**
    * Utility: Wait for element to appear in DOM
    * Returns the element if found, or null if timeout
    */
   protected async waitForElement(
     selector: string,
-    timeout: number = 5000
+    timeout: number = 5000,
   ): Promise<Element | null> {
     const { element } = await domUtils.waitForElement(selector, timeout);
     return element;
   }
-  
+
   /**
    * Utility: Set value on React-controlled input/textarea
    */
   protected setInputValue(
     element: HTMLInputElement | HTMLTextAreaElement,
-    value: string
+    value: string,
   ): void {
     reactUtils.setInputValue(element, value);
   }
-  
+
   /**
    * Utility: Set text content on contenteditable element
    * Uses textContent (not innerHTML) to prevent XSS
@@ -181,7 +194,7 @@ export abstract class BasePlatform implements Platform {
   protected setContentEditableValue(element: HTMLElement, value: string): void {
     reactUtils.setContentEditableValue(element, value);
   }
-  
+
   /**
    * @deprecated Use setInputValue() or setContentEditableValue() instead
    * This method is kept for backward compatibility
@@ -192,7 +205,7 @@ export abstract class BasePlatform implements Platform {
       element instanceof HTMLTextAreaElement
     ) {
       this.setInputValue(element, value);
-    } else if (element.getAttribute('contenteditable') === 'true') {
+    } else if (element.getAttribute("contenteditable") === "true") {
       this.setContentEditableValue(element, value);
     } else {
       // Fallback
@@ -220,8 +233,8 @@ export abstract class BasePlatform implements Platform {
     const config = this.getConfig();
     const hostname = window.location.hostname;
     const pattern = config.hostnamePattern;
-    
-    if (typeof pattern === 'string') {
+
+    if (typeof pattern === "string") {
       return hostname.includes(pattern);
     }
     return pattern.test(hostname);
@@ -264,17 +277,21 @@ export abstract class BasePlatform implements Platform {
    * Open a new chat (navigates to new chat URL)
    * If context is provided, it will be automatically pasted into the new chat
    */
-  openNewChat(context?: string, parentNodeId?: string, parentTreeId?: string): void {
+  openNewChat(
+    context?: string,
+    parentNodeId?: string,
+    parentTreeId?: string,
+  ): void {
     const config = this.getConfig();
     // Store context and parent info for auto-pasting after navigation
     if (context) {
-      chrome.storage.session.set({
+      setSessionStorage({
         arbor_branch_context: context,
         arbor_branch_parent_node_id: parentNodeId || null,
         arbor_branch_parent_tree_id: parentTreeId || null,
-        arbor_branch_timestamp: Date.now().toString()
+        arbor_branch_timestamp: Date.now().toString(),
       }).catch((error) => {
-        console.error('Failed to store branch context:', error);
+        console.error("Failed to store branch context:", error);
       });
     }
     window.location.href = config.newChatUrl;
@@ -303,7 +320,7 @@ export abstract class BasePlatform implements Platform {
 
     const startPolling = () => {
       if (pollInterval !== null) return;
-      
+
       pollInterval = window.setInterval(() => {
         if (!isVisible) return;
         debouncedCallback();
@@ -325,7 +342,7 @@ export abstract class BasePlatform implements Platform {
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     // Start polling
     startPolling();
@@ -338,13 +355,13 @@ export abstract class BasePlatform implements Platform {
         callback(currentChatId);
       }
     };
-    window.addEventListener('popstate', popstateHandler);
+    window.addEventListener("popstate", popstateHandler);
 
     // Return cleanup function
     const cleanup = () => {
       stopPolling();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('popstate', popstateHandler);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("popstate", popstateHandler);
     };
 
     // Store cleanup function
@@ -358,8 +375,10 @@ export abstract class BasePlatform implements Platform {
    */
   async pasteIntoInput(text: string): Promise<boolean> {
     // Rate limiting to prevent spam
-    if (!this.shouldAttempt('pasteIntoInput', 3000, 5)) {
-      console.warn(`🌳 Arbor: Rate limit exceeded for pasteIntoInput on ${this.name}`);
+    if (!this.shouldAttempt("pasteIntoInput", 3000, 5)) {
+      console.warn(
+        `🌳 Arbor: Rate limit exceeded for pasteIntoInput on ${this.name}`,
+      );
       return false;
     }
 
@@ -378,20 +397,24 @@ export abstract class BasePlatform implements Platform {
         if (element && this.isValidInputElement(element, inputType)) {
           await focusElement(element as HTMLElement);
           this.setInputValueByType(element as HTMLElement, text, inputType);
-          console.log(`🌳 Arbor: Context pasted into ${this.name} input field (cached)`);
+          console.log(
+            `🌳 Arbor: Context pasted into ${this.name} input field (cached)`,
+          );
           return true;
         }
       }
 
       while (attempts < maxAttempts) {
-        const { element, selector } = findBestMatch(
-          selectors,
-          (el) => this.isValidInputElement(el, inputType)
+        const { element, selector } = findBestMatch(selectors, (el) =>
+          this.isValidInputElement(el, inputType),
         );
 
         if (element) {
           // Cache the working selector
-          this.selectorCache.set(cacheKey, { selector: selector!, timestamp: Date.now() });
+          this.selectorCache.set(cacheKey, {
+            selector: selector!,
+            timestamp: Date.now(),
+          });
 
           await focusElement(element as HTMLElement);
           this.setInputValueByType(element as HTMLElement, text, inputType);
@@ -401,11 +424,13 @@ export abstract class BasePlatform implements Platform {
         }
 
         // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise((resolve) => setTimeout(resolve, 200));
         attempts++;
       }
 
-      console.warn(`🌳 Arbor: Could not find ${this.name} input field to paste context`);
+      console.warn(
+        `🌳 Arbor: Could not find ${this.name} input field to paste context`,
+      );
       return false;
     } catch (error) {
       console.error(`🌳 Arbor: Error pasting into ${this.name} input:`, error);
@@ -453,13 +478,14 @@ export abstract class BasePlatform implements Platform {
           break;
         }
       } catch (error) {
-        console.warn(`🌳 Arbor [${this.name}]: Error with selector "${selector}":`, error);
+        console.warn(
+          `🌳 Arbor [${this.name}]: Error with selector "${selector}":`,
+          error,
+        );
       }
     }
 
-    if (chats.length === 0) {
-      console.warn(`🌳 Arbor [${this.name}]: No chats found in sidebar. DOM may have changed.`);
-    }
+    // No chats found - this is normal on some pages
 
     return chats;
   }
@@ -480,7 +506,9 @@ export abstract class BasePlatform implements Platform {
           if (href.includes(chatId)) {
             const title = link.textContent?.trim();
             if (title && title.length > 0) {
-              return title.length > 100 ? title.substring(0, 97) + '...' : title;
+              return title.length > 100
+                ? title.substring(0, 97) + "..."
+                : title;
             }
           }
         }
@@ -492,7 +520,7 @@ export abstract class BasePlatform implements Platform {
       const element = document.querySelector(titleConfig.selector);
       if (element) {
         let title: string | null = null;
-        
+
         if (titleConfig.extractor) {
           title = titleConfig.extractor(element);
         } else {
@@ -501,13 +529,13 @@ export abstract class BasePlatform implements Platform {
 
         if (title) {
           // Clean up page title if needed
-          if (titleConfig.selector === 'title' && config.pageTitleCleanup) {
+          if (titleConfig.selector === "title" && config.pageTitleCleanup) {
             title = config.pageTitleCleanup(title);
           }
 
           // Limit length
           if (title.length > 100) {
-            title = title.substring(0, 97) + '...';
+            title = title.substring(0, 97) + "...";
           }
 
           return title;
@@ -521,52 +549,59 @@ export abstract class BasePlatform implements Platform {
   /**
    * Extract all messages from current chat
    */
-  extractMessages(): Array<{ role: 'user' | 'assistant'; content: string }> {
-    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+  extractMessages(): Array<{ role: "user" | "assistant"; content: string }> {
+    const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
     const platformConfig = this.getConfig();
     const config = platformConfig.messageSelectors;
 
     // Try role-specific selectors first
     if (config.user.length > 0 || config.assistant.length > 0) {
-      config.user.forEach(selector => {
+      config.user.forEach((selector) => {
         document.querySelectorAll(selector).forEach((el) => {
           const content = el.textContent?.trim();
           if (content) {
-            messages.push({ role: 'user', content });
+            messages.push({ role: "user", content });
           }
         });
       });
 
-      config.assistant.forEach(selector => {
+      config.assistant.forEach((selector) => {
         document.querySelectorAll(selector).forEach((el) => {
           const content = el.textContent?.trim();
           if (content) {
-            messages.push({ role: 'assistant', content });
+            messages.push({ role: "assistant", content });
           }
         });
       });
     }
 
     // Fallback: Use container selectors with role detector
-    if (messages.length === 0 && config.container && config.container.length > 0) {
-      config.container.forEach(selector => {
+    if (
+      messages.length === 0 &&
+      config.container &&
+      config.container.length > 0
+    ) {
+      config.container.forEach((selector) => {
         document.querySelectorAll(selector).forEach((el) => {
           const content = el.textContent?.trim();
           if (!content) return;
 
-          let role: 'user' | 'assistant' | null = null;
-          
+          let role: "user" | "assistant" | null = null;
+
           if (platformConfig.messageRoleDetector) {
             role = platformConfig.messageRoleDetector(el);
           } else {
             // Heuristic: check classes or attributes
-            const classes = el.className || '';
-            const isUser = classes.includes('user') || classes.includes('User');
-            const isAssistant = classes.includes('assistant') || classes.includes('Assistant') || 
-                               classes.includes('model') || classes.includes('Model');
-            
-            if (isUser) role = 'user';
-            else if (isAssistant) role = 'assistant';
+            const classes = el.className || "";
+            const isUser = classes.includes("user") || classes.includes("User");
+            const isAssistant =
+              classes.includes("assistant") ||
+              classes.includes("Assistant") ||
+              classes.includes("model") ||
+              classes.includes("Model");
+
+            if (isUser) role = "user";
+            else if (isAssistant) role = "assistant";
           }
 
           if (role) {
@@ -585,18 +620,25 @@ export abstract class BasePlatform implements Platform {
    * Check if element is a valid input element for the given type
    */
   private isValidInputElement(element: Element, inputType: string): boolean {
-    if (inputType === 'textarea') {
-      return element instanceof HTMLTextAreaElement && 
-             !element.disabled && 
-             isElementVisible(element);
-    } else if (inputType === 'input') {
-      return (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) &&
-             !(element as HTMLInputElement).disabled &&
-             isElementVisible(element);
-    } else if (inputType === 'contenteditable') {
-      return element instanceof HTMLElement &&
-             element.getAttribute('contenteditable') === 'true' &&
-             isElementVisible(element);
+    if (inputType === "textarea") {
+      return (
+        element instanceof HTMLTextAreaElement &&
+        !element.disabled &&
+        isElementVisible(element)
+      );
+    } else if (inputType === "input") {
+      return (
+        (element instanceof HTMLInputElement ||
+          element instanceof HTMLTextAreaElement) &&
+        !(element as HTMLInputElement).disabled &&
+        isElementVisible(element)
+      );
+    } else if (inputType === "contenteditable") {
+      return (
+        element instanceof HTMLElement &&
+        element.getAttribute("contenteditable") === "true" &&
+        isElementVisible(element)
+      );
     }
     return false;
   }
@@ -604,12 +646,19 @@ export abstract class BasePlatform implements Platform {
   /**
    * Set input value based on input type
    */
-  private setInputValueByType(element: HTMLElement, value: string, inputType: string): void {
-    if (inputType === 'textarea' || inputType === 'input') {
-      if (element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement) {
+  private setInputValueByType(
+    element: HTMLElement,
+    value: string,
+    inputType: string,
+  ): void {
+    if (inputType === "textarea" || inputType === "input") {
+      if (
+        element instanceof HTMLTextAreaElement ||
+        element instanceof HTMLInputElement
+      ) {
         setInputValue(element, value);
       }
-    } else if (inputType === 'contenteditable') {
+    } else if (inputType === "contenteditable") {
       setContentEditableValue(element, value);
     }
   }

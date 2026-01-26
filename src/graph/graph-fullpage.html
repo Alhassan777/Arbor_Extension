@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arbor - Tree Visualization</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      /* Backgrounds — warm charcoal tones */
+      --arbor-bg-deep: #141210;
+      --arbor-bg: #1a1815;
+      --arbor-bg-raised: #211e1a;
+      --arbor-bg-elevated: #292520;
+      
+      /* Primary — sage green (nature/growth) */
+      --arbor-primary: #7d9b76;
+      --arbor-primary-soft: rgba(125, 155, 118, 0.12);
+      --arbor-primary-muted: #5a7255;
+      
+      /* Accent — warm amber */
+      --arbor-accent: #c9a66b;
+      --arbor-accent-soft: rgba(201, 166, 107, 0.15);
+      
+      /* Text — warm tones */
+      --arbor-text-primary: #ebe6df;
+      --arbor-text-secondary: #a39b8f;
+      --arbor-text-tertiary: #726b60;
+      
+      /* Borders */
+      --arbor-border-subtle: #2a2622;
+      --arbor-border-default: #352f29;
+      --arbor-border-strong: #453d35;
+      
+      /* Shadows */
+      --arbor-shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+      --arbor-shadow-md: 0 4px 8px rgba(0,0,0,0.25);
+      --arbor-shadow-lg: 0 8px 24px rgba(0,0,0,0.35);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      background: var(--arbor-bg-deep);
+      color: var(--arbor-text-primary);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* Header */
+    .graph-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--arbor-border-subtle);
+      background: var(--arbor-bg-raised);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-shrink: 0;
+      flex-wrap: nowrap;
+      min-height: 68px;
+    }
+
+    .graph-header-main {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex: 1 1 auto;
+      min-width: 0;
+      flex-wrap: nowrap;
+      overflow: visible;
+    }
+
+    .graph-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--arbor-text-primary);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .tree-selector {
+      position: relative;
+      min-width: 150px;
+      max-width: 300px;
+      flex: 0 1 auto;
+    }
+
+    .tree-selector-trigger {
+      width: 100%;
+      background: var(--arbor-bg-elevated);
+      border: 1px solid var(--arbor-border-default);
+      border-radius: 8px;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--arbor-text-primary);
+      font-size: 14px;
+    }
+
+    .tree-selector-trigger:hover {
+      background: var(--arbor-bg-raised);
+      border-color: var(--arbor-border-strong);
+    }
+
+    .tree-selector-content {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tree-selector-chevron {
+      color: var(--arbor-text-tertiary);
+      transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .tree-selector-trigger[aria-expanded="true"] .tree-selector-chevron {
+      transform: rotate(180deg);
+    }
+
+    .tree-selector-menu {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--arbor-bg-raised);
+      border: 1px solid var(--arbor-border-default);
+      border-radius: 8px;
+      box-shadow: var(--arbor-shadow-lg);
+      z-index: 1000;
+      max-height: 400px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    .tree-selector-menu.open {
+      display: block;
+    }
+
+    .tree-selector-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+      border-bottom: 1px solid var(--arbor-border-subtle);
+    }
+
+    .tree-selector-item:last-child {
+      border-bottom: none;
+    }
+
+    .tree-selector-item:hover {
+      background: var(--arbor-bg-elevated);
+    }
+
+    .tree-selector-item.active {
+      background: var(--arbor-primary-soft);
+    }
+
+    .tree-selector-item-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--arbor-text-primary);
+      margin-bottom: 2px;
+    }
+
+    .tree-selector-item-meta {
+      font-size: 11px;
+      color: var(--arbor-text-tertiary);
+    }
+
+    .tree-selector-refresh {
+      padding: 10px 14px;
+      background: var(--arbor-bg-elevated);
+      border-top: 1px solid var(--arbor-border-default);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--arbor-text-secondary);
+      transition: all 150ms ease;
+    }
+
+    .tree-selector-refresh:hover {
+      background: var(--arbor-bg-raised);
+      color: var(--arbor-primary);
+    }
+
+    /* Zoom controls */
+    .zoom-controls {
+      display: flex;
+      gap: 2px;
+      align-items: center;
+      background: var(--arbor-bg-elevated);
+      border: 1px solid var(--arbor-border-default);
+      border-radius: 6px;
+      padding: 4px;
+      flex-shrink: 0;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+    }
+
+    .zoom-btn {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      background: transparent;
+      color: var(--arbor-text-secondary);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    .zoom-btn:hover {
+      background: var(--arbor-bg-raised);
+      color: var(--arbor-text-primary);
+    }
+
+    .zoom-btn:active {
+      transform: scale(0.95);
+    }
+
+    .zoom-btn:focus-visible {
+      outline: 2px solid var(--arbor-primary);
+      outline-offset: 2px;
+    }
+
+    .zoom-level {
+      font-size: 12px;
+      color: var(--arbor-text-secondary);
+      min-width: 46px;
+      text-align: center;
+      font-weight: 500;
+      padding: 0 6px;
+    }
+
+    .zoom-divider {
+      width: 1px;
+      height: 18px;
+      background: var(--arbor-border-default);
+      margin: 0 2px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+    }
+
+    .icon-btn {
+      height: 36px;
+      padding: 0 12px;
+      background: transparent;
+      border: 1px solid var(--arbor-border-default);
+      border-radius: 6px;
+      color: var(--arbor-text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .icon-btn:hover {
+      background: var(--arbor-bg-elevated);
+      border-color: var(--arbor-border-strong);
+      color: var(--arbor-text-primary);
+    }
+
+    .icon-btn:active {
+      transform: scale(0.95);
+    }
+
+    .icon-btn:focus-visible {
+      outline: 2px solid var(--arbor-primary);
+      outline-offset: 2px;
+    }
+
+    .icon-btn svg {
+      flex-shrink: 0;
+    }
+
+    /* Tooltip styles */
+    [data-tooltip] {
+      position: relative;
+    }
+
+    [data-tooltip]:hover::before {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--arbor-bg-raised);
+      color: var(--arbor-text-primary);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      z-index: 10000;
+      pointer-events: none;
+      box-shadow: var(--arbor-shadow-lg);
+      border: 1px solid var(--arbor-border-default);
+      opacity: 0;
+      animation: tooltipFadeIn 150ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    [data-tooltip]:hover::after {
+      content: '';
+      position: absolute;
+      bottom: calc(100% + 2px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 5px solid var(--arbor-bg-raised);
+      z-index: 10001;
+      pointer-events: none;
+      opacity: 0;
+      animation: tooltipFadeIn 150ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    @keyframes tooltipFadeIn {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    /* Tooltip positioning for buttons on the right side */
+    .header-actions [data-tooltip]:hover::before {
+      left: auto;
+      right: 0;
+      transform: none;
+    }
+
+    .header-actions [data-tooltip]:hover::after {
+      left: auto;
+      right: 8px;
+      transform: none;
+    }
+
+    /* Tooltip positioning for zoom buttons */
+    .zoom-controls [data-tooltip]:hover::before {
+      bottom: auto;
+      top: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .zoom-controls [data-tooltip]:hover::after {
+      bottom: auto;
+      top: calc(100% + 2px);
+      left: 50%;
+      transform: translateX(-50%) rotate(180deg);
+      border-top: none;
+      border-bottom: 5px solid var(--arbor-bg-raised);
+    }
+
+    /* Button action types with color coding */
+    .icon-btn.fullscreen-action:hover {
+      color: var(--arbor-primary);
+      border-color: var(--arbor-primary);
+      background: var(--arbor-primary-soft);
+    }
+
+    .icon-btn.close-action:hover {
+      color: #e67373;
+      border-color: #8b5050;
+      background: rgba(230, 115, 115, 0.08);
+    }
+
+    /* Fullscreen icon state toggle */
+    .icon-btn.fullscreen-active .fullscreen-enter-icon {
+      display: none;
+    }
+
+    .icon-btn.fullscreen-active .fullscreen-exit-icon {
+      display: block !important;
+    }
+
+    .icon-btn-primary {
+      background: var(--arbor-primary-soft);
+      border-color: var(--arbor-primary-muted);
+      color: var(--arbor-primary);
+    }
+
+    .icon-btn-primary:hover {
+      background: rgba(125, 155, 118, 0.18);
+      border-color: var(--arbor-primary);
+      color: var(--arbor-primary);
+    }
+
+    .icon-btn-primary:focus-visible {
+      outline: 2px solid var(--arbor-primary);
+      outline-offset: 2px;
+      background: rgba(125, 155, 118, 0.18);
+    }
+
+    .btn-text {
+      white-space: nowrap;
+    }
+
+    .action-divider {
+      width: 1px;
+      height: 24px;
+      background: linear-gradient(to bottom, 
+        transparent, 
+        var(--arbor-border-default) 20%, 
+        var(--arbor-border-default) 80%, 
+        transparent
+      );
+      margin: 0 4px;
+      flex-shrink: 0;
+    }
+
+    /* Canvas */
+    .graph-canvas {
+      flex: 1;
+      position: relative;
+      overflow: auto;
+      background: var(--arbor-bg-deep);
+      cursor: default;
+    }
+
+    .graph-content {
+      position: relative;
+      width: 2000px;
+      height: 2000px;
+      transform-origin: 0 0;
+    }
+
+    /* Graph Nodes */
+    .graph-node {
+      position: absolute;
+      background: var(--arbor-bg-raised);
+      border: 1px solid var(--arbor-border-subtle);
+      border-radius: 10px;
+      padding: 12px 14px;
+      cursor: grab;
+      transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1),
+                  box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1),
+                  background 150ms cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: var(--arbor-shadow-sm);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .graph-node:hover {
+      background: var(--arbor-bg-elevated);
+      box-shadow: var(--arbor-shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .graph-node:active {
+      cursor: grabbing !important;
+    }
+
+    .graph-node.dragging {
+      opacity: 0.85;
+      box-shadow: var(--arbor-shadow-lg);
+      z-index: 1000 !important;
+      cursor: grabbing !important;
+      transform: scale(1.02);
+    }
+
+    .graph-node.active {
+      background: var(--arbor-primary-soft);
+      border-color: var(--arbor-primary-muted);
+      box-shadow: var(--arbor-shadow-md), 0 0 0 2px var(--arbor-primary-soft);
+    }
+
+    .graph-node.level-0 {
+      border: 2px solid #96794c;
+      box-shadow: var(--arbor-shadow-md), 0 0 16px rgba(201, 166, 107, 0.2);
+      font-weight: 500;
+    }
+
+    .root-accent-dot {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 10px;
+      height: 10px;
+      background: #c9a66b;
+      border-radius: 50%;
+      box-shadow: 0 0 6px rgba(201, 166, 107, 0.4);
+    }
+
+    .graph-node-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--arbor-text-primary);
+      line-height: 1.3;
+    }
+
+    .graph-node.level-0 .graph-node-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    /* SVG Connections */
+    .connection-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+      overflow: visible;
+    }
+
+    .connection-path {
+      cursor: pointer;
+      pointer-events: stroke;
+      transition: all 150ms ease;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* Connection Labels */
+    .connection-label {
+      position: absolute;
+      background: rgba(20, 18, 16, 0.95);
+      border: 1px solid var(--arbor-primary-muted);
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 11px;
+      color: var(--arbor-primary);
+      white-space: nowrap;
+      pointer-events: auto;
+      cursor: pointer;
+      z-index: 10;
+      font-weight: 500;
+      transition: all 0.15s ease;
+      box-shadow: var(--arbor-shadow-sm);
+    }
+
+    .connection-label:hover {
+      background: rgba(26, 24, 21, 0.98);
+      border-color: var(--arbor-primary);
+      transform: translate(-50%, -50%) scale(1.05);
+      box-shadow: var(--arbor-shadow-md);
+    }
+
+    /* Loading State */
+    .loading-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--arbor-text-secondary);
+      gap: 16px;
+    }
+
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--arbor-border-default);
+      border-top-color: var(--arbor-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    /* Error State */
+    .error-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--arbor-text-secondary);
+      gap: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .error-icon {
+      font-size: 48px;
+      color: var(--arbor-text-tertiary);
+    }
+
+    .error-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--arbor-text-primary);
+    }
+
+    .error-message {
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 400px;
+    }
+
+    /* Reload button in error state */
+    #reload-page-btn {
+      padding: 10px 20px;
+      background: var(--arbor-primary);
+      color: var(--arbor-bg-deep);
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 150ms ease;
+    }
+
+    #reload-page-btn:hover {
+      background: var(--arbor-primary-muted);
+      transform: translateY(-1px);
+      box-shadow: var(--arbor-shadow-md);
+    }
+
+    #reload-page-btn:active {
+      transform: translateY(0);
+    }
+
+    #close-window-btn-error {
+      padding: 10px 20px;
+      background: transparent;
+      color: var(--arbor-text-secondary);
+      border: 1px solid var(--arbor-border-default);
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 150ms ease;
+    }
+
+    #close-window-btn-error:hover {
+      background: var(--arbor-bg-raised);
+      border-color: var(--arbor-border-strong);
+      color: var(--arbor-text-primary);
+    }
+
+    #close-window-btn-error:active {
+      transform: scale(0.98);
+    }
+
+    .error-state code {
+      background: rgba(201, 166, 107, 0.15);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 12px;
+    }
+
+    /* Scrollbar */
+    .graph-canvas::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    .graph-canvas::-webkit-scrollbar-track {
+      background: var(--arbor-bg);
+    }
+
+    .graph-canvas::-webkit-scrollbar-thumb {
+      background: var(--arbor-border-default);
+      border-radius: 5px;
+    }
+
+    .graph-canvas::-webkit-scrollbar-thumb:hover {
+      background: var(--arbor-border-strong);
+    }
+
+    /* Responsive styles for narrow windows */
+    @media (max-width: 900px) {
+      .graph-header {
+        padding: 12px 16px;
+        gap: 12px;
+      }
+
+      .graph-header-main {
+        gap: 12px;
+      }
+
+      .graph-title {
+        font-size: 16px;
+      }
+
+      .tree-selector {
+        min-width: 120px;
+        max-width: 200px;
+      }
+
+      .zoom-controls {
+        padding: 3px;
+        gap: 1px;
+      }
+
+      .zoom-btn {
+        width: 28px;
+        height: 28px;
+      }
+
+      .header-actions {
+        gap: 6px;
+      }
+
+      .icon-btn {
+        height: 32px;
+        padding: 0 10px;
+        font-size: 12px;
+      }
+
+      .btn-text {
+        display: none;
+      }
+
+      .icon-btn {
+        padding: 0 8px;
+      }
+
+      .action-divider {
+        display: none;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .graph-title {
+        display: none;
+      }
+
+      .tree-selector {
+        flex: 1 1 auto;
+        max-width: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="graph-header">
+    <div class="graph-header-main">
+      <div class="tree-selector">
+        <button class="tree-selector-trigger" id="tree-selector-trigger" aria-expanded="false">
+          <span class="tree-selector-content" id="tree-selector-content">Loading...</span>
+          <svg class="tree-selector-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="tree-selector-menu" id="tree-selector-menu"></div>
+      </div>
+
+      <div class="zoom-controls">
+        <button id="zoom-out-btn" class="zoom-btn" aria-label="Zoom out" data-tooltip="Zoom out - Decrease the zoom level to see more of the tree">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.3"/>
+            <path d="M5 8h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <span id="zoom-level" class="zoom-level">100%</span>
+        <button id="zoom-in-btn" class="zoom-btn" aria-label="Zoom in" data-tooltip="Zoom in - Increase the zoom level to see details">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" fill="none" opacity="0.3"/>
+            <path d="M8 5v6M5 8h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <div class="zoom-divider"></div>
+        <button id="zoom-reset-btn" class="zoom-btn" aria-label="Reset zoom to 100%" data-tooltip="Reset zoom - Return to 100% zoom level (1:1 scale)">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            <path d="M8 1v2M8 13v2M1 8h2M13 8h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button id="reset-layout-btn" class="icon-btn layout-action" aria-label="Reset layout to default positions" data-tooltip="Reset layout - Reorganize all nodes to their default positions" style="display: none;">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <!-- Grid dots -->
+          <circle cx="5" cy="5" r="1.5" fill="currentColor"/>
+          <circle cx="9" cy="5" r="1.5" fill="currentColor"/>
+          <circle cx="13" cy="5" r="1.5" fill="currentColor"/>
+          <circle cx="5" cy="9" r="1.5" fill="currentColor"/>
+          <circle cx="9" cy="9" r="1.5" fill="currentColor"/>
+          <circle cx="13" cy="9" r="1.5" fill="currentColor"/>
+          <circle cx="5" cy="13" r="1.5" fill="currentColor"/>
+          <circle cx="9" cy="13" r="1.5" fill="currentColor"/>
+          <circle cx="13" cy="13" r="1.5" fill="currentColor"/>
+        </svg>
+        <span class="btn-text">Reset</span>
+      </button>
+      
+      <div class="action-divider"></div>
+      
+      <button id="fullscreen-btn" class="icon-btn fullscreen-action" aria-label="Toggle fullscreen" title="Enter fullscreen mode (F)">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" class="fullscreen-enter-icon">
+          <path d="M2 8V3h5M16 8V3h-5M2 10v5h5M16 10v5h-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" class="fullscreen-exit-icon" style="display: none;">
+          <path d="M8 2v5H3M10 2v5h5M8 16v-5H3M10 16v-5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="btn-text">Fullscreen</span>
+      </button>
+      
+      <div class="action-divider"></div>
+      
+      <button id="close-window-btn" class="icon-btn close-action" aria-label="Close window" title="Close this window (Escape)">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M4.5 4.5l9 9M13.5 4.5l-9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="btn-text">Close</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="graph-canvas" id="graph-canvas">
+    <div class="loading-state" id="loading-state">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Loading tree data...</div>
+    </div>
+    <div class="graph-content" id="graph-content"></div>
+  </div>
+
+  <script src="graph-fullpage.js"></script>
+</body>
+</html>

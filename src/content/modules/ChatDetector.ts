@@ -19,21 +19,11 @@ export class ChatDetector {
 
   async scanAvailableChats(): Promise<AvailableChat[]> {
     try {
-      console.log(
-        `🌳 Arbor [ChatDetector]: Scanning for ${this.platform} chats...`,
-      );
-
       if (!this.platformAdapter) {
-        console.warn(
-          `🌳 Arbor [ChatDetector]: No platform adapter found for ${this.platform}`,
-        );
         return [];
       }
 
       const chats = this.platformAdapter.getAllChatsFromSidebar();
-      console.log(
-        `🌳 Arbor [ChatDetector]: Found ${chats.length} chats for ${this.platform}`,
-      );
 
       return chats.map((chat: { id: string; title: string; url: string }) => ({
         ...chat,

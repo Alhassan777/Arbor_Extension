@@ -13,16 +13,19 @@ export class SidebarObserver {
 
       this.debounceTimer = window.setTimeout(() => {
         this.debounceTimer = null;
-        
+
         // Only check if sidebar is visible (no point checking if hidden)
         if (!this.isVisible) return;
 
         // Use requestIdleCallback for non-urgent checks
-        if ('requestIdleCallback' in window) {
-          this.idleCallbackId = requestIdleCallback(() => {
-            this.checkSidebarExists(onSidebarRemoved);
-            this.idleCallbackId = null;
-          }, { timeout: 1000 });
+        if ("requestIdleCallback" in window) {
+          this.idleCallbackId = requestIdleCallback(
+            () => {
+              this.checkSidebarExists(onSidebarRemoved);
+              this.idleCallbackId = null;
+            },
+            { timeout: 1000 },
+          );
         } else {
           // Fallback for browsers without requestIdleCallback
           this.checkSidebarExists(onSidebarRemoved);
@@ -40,16 +43,13 @@ export class SidebarObserver {
 
     // Track visibility to pause checks when tab is hidden
     this.setupVisibilityListener();
-
-    console.log('👀 Sidebar observer active (debounced)');
   }
 
   private checkSidebarExists(onSidebarRemoved: () => void) {
-    const sidebarExists = document.getElementById('arbor-sidebar-container');
-    const graphExists = document.getElementById('arbor-graph-container');
+    const sidebarExists = document.getElementById("arbor-sidebar-container");
+    const graphExists = document.getElementById("arbor-graph-container");
 
     if (!sidebarExists || !graphExists) {
-      console.log('🔄 Sidebar removed, triggering re-injection...');
       onSidebarRemoved();
     }
   }
@@ -59,7 +59,7 @@ export class SidebarObserver {
       this.isVisible = !document.hidden;
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     handleVisibilityChange();
   }
 

@@ -10,6 +10,7 @@ module.exports = {
     background: './src/background/background.ts',
     options: './src/options/options.ts',
     'summarization.worker': './src/workers/summarization.worker.ts',
+    'graph-fullpage': './src/graph/graph-fullpage.ts',
   },
   module: {
     rules: [
@@ -77,6 +78,10 @@ module.exports = {
         {
           from: 'src/options/options.css',
           to: 'options.css',
+        },
+        {
+          from: 'src/graph/graph-fullpage.html',
+          to: 'graph-fullpage.html',
         },
         {
           from: 'PRIVACY_POLICY.md',

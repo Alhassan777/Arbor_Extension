@@ -2,7 +2,7 @@
  * GraphPanZoom - Handles panning and zooming for the graph canvas
  *
  * Features:
- * - Zoom with mouse/touchpad scroll wheel (no modifier key needed)
+ * - Zoom with two-finger pinch gesture (touchpad/mouse)
  * - Pan with Space + drag
  * - Respects node dragging (doesn't interfere)
  */
@@ -20,6 +20,9 @@ export class GraphPanZoom {
   private canvas: HTMLElement | null = null;
   private content: HTMLElement | null = null;
   private wheelHandler: ((e: WheelEvent) => void) | null = null;
+  private touchstartHandler: ((e: TouchEvent) => void) | null = null;
+  private touchmoveHandler: ((e: TouchEvent) => void) | null = null;
+  private touchendHandler: ((e: TouchEvent) => void) | null = null;
   private mousedownHandler: ((e: MouseEvent) => void) | null = null;
   private mousemoveHandler: ((e: MouseEvent) => void) | null = null;
   private mouseupHandler: (() => void) | null = null;
@@ -30,6 +33,9 @@ export class GraphPanZoom {
   private isMouseOverCanvas: boolean = false;
   private initialized: boolean = false;
   private onScaleChange: (() => void) | null = null;
+  private initialPinchDistance: number = 0;
+  private initialPinchScale: number = 1;
+  private isPinching: boolean = false;
 
   /**
    * Initialize pan and zoom for the graph canvas
@@ -55,7 +61,7 @@ export class GraphPanZoom {
 
     this.setupMouseTracking();
     this.setupSpaceKey();
-    this.setupZoom();
+    this.setupPinchZoom();
     this.setupPan();
     this.applyTransform(); // Initialize transform
     this.initialized = true;
@@ -129,41 +135,119 @@ export class GraphPanZoom {
   }
 
   /**
-   * Setup zoom functionality (mouse/touchpad scroll wheel)
+   * Calculate distance between two touch points
    */
-  private setupZoom() {
+  private getTouchDistance(touch1: Touch, touch2: Touch): number {
+    const dx = touch2.clientX - touch1.clientX;
+    const dy = touch2.clientY - touch1.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  /**
+   * Setup zoom functionality using two-finger pinch gesture
+   */
+  private setupPinchZoom() {
     if (!this.canvas || !this.content) return;
 
-    this.wheelHandler = (e: WheelEvent) => {
-      const target = e.target as HTMLElement;
+    this.touchstartHandler = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        const target = e.target as HTMLElement;
 
-      // Don't zoom if scrolling on interactive elements (let them handle their own scrolling)
-      const isOnInteractive =
-        target.closest(".graph-node") ||
-        target.closest(".connection-line") ||
-        target.closest(".connection-label") ||
-        target.closest(".connection-add-label");
+        // Don't zoom if pinching on interactive elements
+        const isOnInteractive =
+          target.closest(".graph-node") ||
+          target.closest(".connection-line") ||
+          target.closest(".connection-label") ||
+          target.closest(".connection-add-label");
 
-      // If Space is pressed, we're in pan mode, so don't zoom
-      if (this.isSpacePressed) {
-        return;
+        if (isOnInteractive) {
+          return;
+        }
+
+        // If Space is pressed, we're in pan mode, so don't zoom
+        if (this.isSpacePressed) {
+          return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        this.isPinching = true;
+        this.initialPinchDistance = this.getTouchDistance(
+          e.touches[0],
+          e.touches[1],
+        );
+        this.initialPinchScale = this.scale;
       }
-
-      // If on interactive element, allow default scroll behavior
-      if (isOnInteractive) {
-        return;
-      }
-
-      // Otherwise, zoom with scroll wheel
-      e.preventDefault();
-      e.stopPropagation();
-
-      const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      this.scale = Math.min(2.5, Math.max(0.5, this.scale + delta));
-
-      this.applyScale();
     };
 
+    this.touchmoveHandler = (e: TouchEvent) => {
+      if (this.isPinching && e.touches.length === 2) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const currentDistance = this.getTouchDistance(
+          e.touches[0],
+          e.touches[1],
+        );
+        const scaleChange = currentDistance / this.initialPinchDistance;
+        const newScale = this.initialPinchScale * scaleChange;
+
+        this.scale = Math.min(2.5, Math.max(0.5, newScale));
+        this.applyScale();
+      }
+    };
+
+    this.touchendHandler = (e: TouchEvent) => {
+      if (this.isPinching && e.touches.length < 2) {
+        this.isPinching = false;
+        this.initialPinchDistance = 0;
+        this.initialPinchScale = 1;
+      }
+    };
+
+    // Also handle wheel events for pinch gestures on trackpads
+    // Modern trackpads send wheel events with ctrlKey=true for pinch gestures
+    this.wheelHandler = (e: WheelEvent) => {
+      // Only handle pinch gestures (Ctrl/Cmd + wheel) or trackpad pinch (which sets ctrlKey)
+      if (e.ctrlKey || e.metaKey) {
+        const target = e.target as HTMLElement;
+
+        // Don't zoom if pinching on interactive elements
+        const isOnInteractive =
+          target.closest(".graph-node") ||
+          target.closest(".connection-line") ||
+          target.closest(".connection-label") ||
+          target.closest(".connection-add-label");
+
+        if (isOnInteractive) {
+          return;
+        }
+
+        // If Space is pressed, we're in pan mode, so don't zoom
+        if (this.isSpacePressed) {
+          return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Use deltaY for pinch zoom (negative = zoom out, positive = zoom in)
+        const zoomFactor = 1 + (e.deltaY > 0 ? -0.05 : 0.05);
+        this.scale = Math.min(2.5, Math.max(0.5, this.scale * zoomFactor));
+        this.applyScale();
+      }
+    };
+
+    this.canvas.addEventListener("touchstart", this.touchstartHandler, {
+      passive: false,
+    });
+    this.canvas.addEventListener("touchmove", this.touchmoveHandler, {
+      passive: false,
+    });
+    this.canvas.addEventListener("touchend", this.touchendHandler, {
+      passive: false,
+    });
     this.canvas.addEventListener("wheel", this.wheelHandler, {
       passive: false,
     });
@@ -265,10 +349,17 @@ export class GraphPanZoom {
     this.content.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
     this.content.dataset.scale = String(this.scale);
 
-    // Call the callback if set
+    // Call the callback if set (for zoom changes)
     if (this.onScaleChange) {
       this.onScaleChange();
     }
+
+    // Dispatch event for pan/zoom changes
+    window.dispatchEvent(
+      new CustomEvent("arbor-graph-transform-changed", {
+        detail: { scale: this.scale, panX: this.panX, panY: this.panY },
+      }),
+    );
   }
 
   /**
@@ -289,6 +380,20 @@ export class GraphPanZoom {
   }
 
   /**
+   * Get current pan X position
+   */
+  getPanX(): number {
+    return this.panX;
+  }
+
+  /**
+   * Get current pan Y position
+   */
+  getPanY(): number {
+    return this.panY;
+  }
+
+  /**
    * Set zoom scale programmatically
    */
   setScale(scale: number) {
@@ -302,6 +407,18 @@ export class GraphPanZoom {
   destroy() {
     if (this.canvas && this.wheelHandler) {
       this.canvas.removeEventListener("wheel", this.wheelHandler);
+    }
+
+    if (this.canvas && this.touchstartHandler) {
+      this.canvas.removeEventListener("touchstart", this.touchstartHandler);
+    }
+
+    if (this.canvas && this.touchmoveHandler) {
+      this.canvas.removeEventListener("touchmove", this.touchmoveHandler);
+    }
+
+    if (this.canvas && this.touchendHandler) {
+      this.canvas.removeEventListener("touchend", this.touchendHandler);
     }
 
     if (this.canvas && this.mousedownHandler) {
@@ -337,9 +454,15 @@ export class GraphPanZoom {
     this.isPanning = false;
     this.isSpacePressed = false;
     this.isMouseOverCanvas = false;
+    this.isPinching = false;
     this.panX = 0;
     this.panY = 0;
+    this.initialPinchDistance = 0;
+    this.initialPinchScale = 1;
     this.wheelHandler = null;
+    this.touchstartHandler = null;
+    this.touchmoveHandler = null;
+    this.touchendHandler = null;
     this.mousedownHandler = null;
     this.mousemoveHandler = null;
     this.mouseupHandler = null;

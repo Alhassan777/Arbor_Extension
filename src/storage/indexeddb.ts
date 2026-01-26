@@ -24,6 +24,7 @@ class ArborDatabase {
       return this.initPromise;
     }
 
+    
     // Start initialization and store the promise
     this.initPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -32,9 +33,14 @@ class ArborDatabase {
         this.initPromise = null;
         reject(request.error);
       };
+      
       request.onsuccess = () => {
         this.db = request.result;
         this.initPromise = null;
+        
+        // Log current contents
+        this.logDatabaseContents();
+        
         resolve();
       };
 
@@ -65,9 +71,103 @@ class ArborDatabase {
     return this.initPromise;
   }
 
+  // Helper to log database contents (for debugging)
+  private async logDatabaseContents(): Promise<void> {
+    try {
+      // Check chrome.storage.local
+      try {
+        const result = await chrome.storage.local.get('arbor_trees');
+        const storedTrees = result.arbor_trees || {};
+        const treeArray = Object.values(storedTrees) as ChatTree[];
+        if (treeArray.length > 0) {
+          // Migrate trees to chrome.storage.local if not already there
+          // Check IndexedDB
+          if (!this.db) return;
+          
+          const transaction = this.db.transaction(['trees'], 'readonly');
+          const store = transaction.objectStore('trees');
+          const trees = await this.promisify<ChatTree[]>(store.getAll());
+          if (trees.length > 0) {
+            await this.migrateTreesToSharedStorage(trees);
+          }
+        }
+      } catch (error) {
+        // Silent fail
+      }
+    } catch (error) {
+      // Silent fail
+    }
+  }
+
+  // Migrate trees from IndexedDB to chrome.storage.local (one-time migration)
+  private async migrateTreesToSharedStorage(trees: ChatTree[]): Promise<void> {
+    try {
+      const result = await chrome.storage.local.get('arbor_trees');
+      const storedTrees = result.arbor_trees || {};
+      
+      let migratedCount = 0;
+      let updatedCount = 0;
+      
+      for (const tree of trees) {
+        if (!storedTrees[tree.id]) {
+          storedTrees[tree.id] = tree;
+          migratedCount++;
+        } else {
+          // Update existing tree if IndexedDB version is newer
+          const existingTree = storedTrees[tree.id];
+          if (new Date(tree.updatedAt) > new Date(existingTree.updatedAt)) {
+            storedTrees[tree.id] = tree;
+            updatedCount++;
+          }
+        }
+      }
+      
+      if (migratedCount > 0 || updatedCount > 0) {
+        await chrome.storage.local.set({ arbor_trees: storedTrees });
+      } else {
+      }
+    } catch (error) {
+    }
+  }
+
+  // Public method to force migration (useful for debugging)
+  async forceMigration(): Promise<void> {
+    if (!this.db) {
+      await this.init();
+    }
+    
+    if (!this.db) {
+      return;
+    }
+    
+    const transaction = this.db.transaction(['trees'], 'readonly');
+    const store = transaction.objectStore('trees');
+    const trees = await this.promisify<ChatTree[]>(store.getAll());
+    
+    if (trees.length > 0) {
+      await this.migrateTreesToSharedStorage(trees);
+    } else {
+    }
+  }
+
   // Tree operations
   async saveTree(tree: ChatTree): Promise<void> {
-    const transaction = this.db!.transaction(['trees'], 'readwrite');
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+    
+    
+    // Save to chrome.storage.local (shared across all contexts - content script & extension pages)
+    try {
+      const result = await chrome.storage.local.get('arbor_trees');
+      const trees = result.arbor_trees || {};
+      trees[tree.id] = tree;
+      await chrome.storage.local.set({ arbor_trees: trees });
+    } catch (error) {
+    }
+    
+    // Also save to IndexedDB for backward compatibility
+    const transaction = this.db.transaction(['trees'], 'readwrite');
     const store = transaction.objectStore('trees');
     await this.promisify(store.put(tree));
   }
@@ -79,6 +179,17 @@ class ArborDatabase {
   }
 
   async getTree(treeId: string): Promise<ChatTree | null> {
+    // Try chrome.storage.local first (shared storage)
+    try {
+      const result = await chrome.storage.local.get('arbor_trees');
+      const trees = result.arbor_trees || {};
+      if (trees[treeId]) {
+        return trees[treeId];
+      }
+    } catch (error) {
+    }
+    
+    // Fallback to IndexedDB
     const transaction = this.db!.transaction(['trees'], 'readonly');
     const store = transaction.objectStore('trees');
     const tree = await this.promisify<ChatTree>(store.get(treeId));
@@ -86,12 +197,40 @@ class ArborDatabase {
   }
 
   async getAllTrees(): Promise<ChatTree[]> {
-    const transaction = this.db!.transaction(['trees'], 'readonly');
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+    
+    
+    // Try chrome.storage.local first (shared storage)
+    try {
+      const result = await chrome.storage.local.get('arbor_trees');
+      const trees = result.arbor_trees || {};
+      const treeArray = Object.values(trees) as ChatTree[];
+      if (treeArray.length > 0) {
+        return treeArray;
+      }
+    } catch (error) {
+    }
+    
+    // Fallback to IndexedDB
+    const transaction = this.db.transaction(['trees'], 'readonly');
     const store = transaction.objectStore('trees');
-    return await this.promisify<ChatTree[]>(store.getAll());
+    const trees = await this.promisify<ChatTree[]>(store.getAll());
+    return trees;
   }
 
   async deleteTree(treeId: string): Promise<void> {
+    // Delete from chrome.storage.local
+    try {
+      const result = await chrome.storage.local.get('arbor_trees');
+      const trees = result.arbor_trees || {};
+      delete trees[treeId];
+      await chrome.storage.local.set({ arbor_trees: trees });
+    } catch (error) {
+    }
+    
+    // Also delete from IndexedDB
     const transaction = this.db!.transaction(['trees'], 'readwrite');
     const store = transaction.objectStore('trees');
     await this.promisify(store.delete(treeId));
@@ -99,7 +238,11 @@ class ArborDatabase {
 
   // Node operations
   async saveNode(node: ChatNode, treeId: string): Promise<void> {
-    const transaction = this.db!.transaction(['nodes'], 'readwrite');
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+    
+    const transaction = this.db.transaction(['nodes'], 'readwrite');
     const store = transaction.objectStore('nodes');
     await this.promisify(store.put({ ...node, treeId }));
   }
@@ -199,7 +342,6 @@ class ArborDatabase {
       return state;
     } catch (error) {
       // Handle case where transaction fails (e.g., database closed)
-      console.warn("🌳 Arbor: Failed to get state from database:", error);
       return {};
     }
   }
@@ -248,6 +390,18 @@ class ArborDatabase {
 
       // Batch write trees
       if (trees.length > 0) {
+        // Write to chrome.storage.local (shared storage)
+        try {
+          const result = await chrome.storage.local.get('arbor_trees');
+          const storedTrees = result.arbor_trees || {};
+          for (const item of trees) {
+            storedTrees[item.data.id] = item.data;
+          }
+          await chrome.storage.local.set({ arbor_trees: storedTrees });
+        } catch (error) {
+        }
+        
+        // Also write to IndexedDB
         const transaction = this.db.transaction(['trees'], 'readwrite');
         const store = transaction.objectStore('trees');
         
@@ -288,6 +442,37 @@ class ArborDatabase {
       this.flushTimer = null;
     }
     await this.flushWrites();
+  }
+
+  // Public method to verify database contents (for debugging)
+  async verifyDatabase(): Promise<{
+    trees: number;
+    nodes: number;
+    treeDetails: Array<{ id: string; name: string; nodeCount: number }>;
+  }> {
+    if (!this.db) {
+      await this.init();
+    }
+
+    const transaction = this.db!.transaction(['trees', 'nodes'], 'readonly');
+    const treeStore = transaction.objectStore('trees');
+    const nodeStore = transaction.objectStore('nodes');
+
+    const trees = await this.promisify<ChatTree[]>(treeStore.getAll());
+    const nodes = await this.promisify<any[]>(nodeStore.getAll());
+
+    const treeDetails = trees.map(tree => ({
+      id: tree.id,
+      name: tree.name,
+      nodeCount: Object.keys(tree.nodes).length
+    }));
+
+
+    return {
+      trees: trees.length,
+      nodes: nodes.length,
+      treeDetails
+    };
   }
 }
 

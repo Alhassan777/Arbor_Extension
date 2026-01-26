@@ -19,25 +19,12 @@ export class PlatformFactory {
    * Get the currently active platform
    */
   static getActivePlatform(): Platform | null {
-    console.log(
-      `🌳 Arbor [Factory]: Checking ${this.platforms.length} registered platforms...`,
-    );
-
     for (const platform of this.platforms) {
-      const isActive = platform.isActive();
-      console.log(
-        `🌳 Arbor [Factory]: Platform "${platform.name}" isActive: ${isActive}`,
-      );
-
-      if (isActive) {
-        console.log(
-          `🌳 Arbor [Factory]: ✅ Active platform found: ${platform.name}`,
-        );
+      if (platform.isActive()) {
         return platform;
       }
     }
 
-    console.warn("🌳 Arbor [Factory]: ❌ No active platform found");
     return null;
   }
 

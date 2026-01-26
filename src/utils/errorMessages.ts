@@ -22,7 +22,7 @@ export function getUserFriendlyError(error: any): ErrorDetails {
   }
   
   // Handle Error objects
-  const errorMessage = error?.message || String(error);
+  const errorMessage: string = error?.message || String(error) || 'Unknown error';
   const statusCode = error?.status || error?.statusCode || error?.code;
   
   // Network errors
